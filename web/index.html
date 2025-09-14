@@ -228,12 +228,12 @@
             
             #game-area {
                 flex: 1;
-                padding: 10px;
+                padding: 8px;
                 display: flex;
                 justify-content: center;
                 align-items: center;
                 min-height: 0;
-                max-height: calc(100vh - 200px);
+                max-height: calc(100vh - 250px);
                 overflow: hidden;
             }
             
@@ -243,17 +243,18 @@
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                max-width: calc(100vw - 20px);
-                max-height: calc(100vh - 200px);
+                max-width: calc(100vw - 40px);
+                max-height: calc(100vh - 250px);
             }
             
             #game-canvas {
-                max-width: calc(100vw - 40px);
+                max-width: 85vw;
                 max-height: calc(100vh - 200px);
                 width: auto;
                 height: auto;
                 aspect-ratio: 1;
                 object-fit: contain;
+                display: block;
             }
             
             #game-sidebar {
@@ -346,6 +347,7 @@
                 display: flex;
                 justify-content: center;
                 align-items: center;
+                position: relative;
             }
             
             #game-canvas-container {
@@ -354,13 +356,21 @@
                 display: flex;
                 justify-content: center;
                 align-items: center;
+                position: relative;
             }
             
             #game-canvas {
-                max-width: 600px;
-                max-height: 600px;
+                max-width: min(80vw, 800px);
+                max-height: min(80vh, 800px);
                 width: auto;
                 height: auto;
+                aspect-ratio: 1;
+                object-fit: contain;
+                display: block;
+                margin: 0 auto;
+                border: 2px solid #2a3f5f;
+                border-radius: 8px;
+                background: #1a1f36;
             }
             
             #score-panel {
@@ -624,6 +634,11 @@
                 // Optimize canvas after showing game container
                 setTimeout(() => {
                     optimizeCanvas();
+                    
+                    // Trigger a window resize event to ensure WASM game picks up new canvas size
+                    setTimeout(() => {
+                        window.dispatchEvent(new Event('resize'));
+                    }, 200);
                 }, 100);
                 
                 console.log('Running WebAssembly module...');
@@ -662,7 +677,7 @@
             e.preventDefault();
         }, { passive: false });
         
-        // Canvas optimization for both mobile and desktop
+        // Responsive canvas optimization for both mobile and desktop
         function optimizeCanvas() {
             const canvas = document.getElementById('game-canvas');
             const container = document.getElementById('game-canvas-container');
@@ -670,46 +685,68 @@
             if (canvas && container) {
                 const isMobile = window.innerWidth < 768;
                 
-                if (isMobile) {
-                    // Calculate optimal size for mobile - more conservative sizing
+                // Calculate responsive size based on available space
+                setTimeout(() => {
+                    const containerRect = container.getBoundingClientRect();
                     const viewportWidth = window.innerWidth;
                     const viewportHeight = window.innerHeight;
-                    const availableWidth = viewportWidth - 40; // Account for padding
                     
-                    // Account for title (~70px) + controls (~120px) + padding
-                    const availableHeight = viewportHeight - 200;
+                    let finalSize;
                     
-                    // Use smaller of width/height and cap at smaller size for mobile
-                    const optimalSize = Math.min(availableWidth, availableHeight);
-                    const maxMobileSize = Math.min(optimalSize, 320); // Smaller cap for mobile
-                    
-                    // Ensure minimum size
-                    const finalSize = Math.max(maxMobileSize, 250);
-                    
-                    canvas.style.width = finalSize + 'px';
-                    canvas.style.height = finalSize + 'px';
-                    
-                    // Set canvas resolution
-                    canvas.width = finalSize;
-                    canvas.height = finalSize;
-                } else {
-                    // Desktop sizing - wait for container to be sized
-                    setTimeout(() => {
-                        const containerRect = container.getBoundingClientRect();
-                        const availableWidth = containerRect.width * 0.9;
-                        const availableHeight = containerRect.height * 0.9;
-                        const size = Math.min(availableWidth, availableHeight, 600);
-                        
-                        if (size > 0) {
-                            canvas.style.width = size + 'px';
-                            canvas.style.height = size + 'px';
-                            
-                            // Set canvas resolution
-                            canvas.width = size;
-                            canvas.height = size;
+                    if (isMobile) {
+                        // Mobile: Use actual available space with safety margins
+                        if (containerRect.width > 0 && containerRect.height > 0) {
+                            // Use container dimensions with padding
+                            const containerWidth = containerRect.width - 20;
+                            const containerHeight = containerRect.height - 20;
+                            finalSize = Math.min(containerWidth, containerHeight);
+                        } else {
+                            // Fallback: Use viewport with UI space reserved
+                            const availableWidth = viewportWidth - 40;
+                            const availableHeight = viewportHeight - 200; // Title + controls + padding
+                            finalSize = Math.min(availableWidth, availableHeight);
                         }
-                    }, 100);
-                }
+                        
+                        // Ensure reasonable bounds for mobile
+                        finalSize = Math.max(Math.min(finalSize, viewportWidth * 0.85), 180);
+                        
+                    } else {
+                        // Desktop: Use container space efficiently
+                        if (containerRect.width > 0 && containerRect.height > 0) {
+                            const containerWidth = containerRect.width * 0.9;
+                            const containerHeight = containerRect.height * 0.9;
+                            finalSize = Math.min(containerWidth, containerHeight);
+                        } else {
+                            // Fallback for desktop
+                            finalSize = Math.min(viewportWidth * 0.6, viewportHeight * 0.8, 600);
+                        }
+                        
+                        // Ensure reasonable bounds for desktop
+                        finalSize = Math.max(Math.min(finalSize, 800), 300);
+                    }
+                    
+                    console.log(`Responsive canvas sizing: ${isMobile ? 'Mobile' : 'Desktop'} - container(${containerRect.width}x${containerRect.height}), viewport(${viewportWidth}x${viewportHeight}), final: ${Math.round(finalSize)}px`);
+                    
+                    // Apply the calculated size
+                    const roundedSize = Math.round(finalSize);
+                    canvas.style.width = roundedSize + 'px';
+                    canvas.style.height = roundedSize + 'px';
+                    
+                    // Set canvas resolution to match display size exactly
+                    canvas.width = roundedSize;
+                    canvas.height = roundedSize;
+                    
+                    // Ensure canvas is properly centered and positioned
+                    canvas.style.display = 'block';
+                    canvas.style.margin = '0 auto';
+                    
+                    // Clear any transform or positioning that might offset the canvas
+                    canvas.style.transform = 'none';
+                    canvas.style.position = 'static';
+                    
+                    console.log(`Canvas applied: ${roundedSize}px display, ${canvas.width}x${canvas.height} resolution`);
+                    
+                }, isMobile ? 50 : 100);
             }
         }
         

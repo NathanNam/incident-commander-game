@@ -19,10 +19,6 @@ type Renderer struct {
 func New(canvas js.Value) *Renderer {
 	ctx := canvas.Call("getContext", "2d")
 	
-	// Set canvas size
-	canvas.Set("width", 600)
-	canvas.Set("height", 600)
-	
 	// Get the mascot image element
 	document := js.Global().Get("document")
 	mascotImg := document.Call("getElementById", "mascot-img")
@@ -30,13 +26,38 @@ func New(canvas js.Value) *Renderer {
 	return &Renderer{
 		canvas: canvas,
 		ctx:    ctx,
-		cellSize: 30, // 600/20 = 30px per cell for 20x20 grid
+		cellSize: 30, // Will be calculated dynamically
 		mascotImg: mascotImg,
 	}
 }
 
+// updateCellSize calculates the cell size based on current canvas dimensions and grid size
+func (r *Renderer) updateCellSize(g *game.Game) {
+	canvasWidth := r.canvas.Get("width").Int()
+	canvasHeight := r.canvas.Get("height").Int()
+	
+	// Use the smaller dimension to ensure the grid fits
+	canvasSize := canvasWidth
+	if canvasHeight < canvasWidth {
+		canvasSize = canvasHeight
+	}
+	
+	// Calculate cell size based on grid dimensions
+	gridWidth := g.GetWidth()
+	gridHeight := g.GetHeight()
+	gridSize := gridWidth
+	if gridHeight > gridWidth {
+		gridSize = gridHeight
+	}
+	
+	r.cellSize = canvasSize / gridSize
+}
+
 // Render renders the current game state
 func (r *Renderer) Render(g *game.Game) {
+	// Update cell size based on current canvas dimensions
+	r.updateCellSize(g)
+	
 	r.clearCanvas()
 	r.drawGrid(g)
 	r.drawObstacles(g)
