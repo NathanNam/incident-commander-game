@@ -226,22 +226,20 @@ stop-daemon:
 # Install systemd service (Ubuntu)
 install-service: build-ubuntu
 	@echo "🔧 Installing systemd service..."
-	@sudo tee /etc/systemd/system/incident-commander.service > /dev/null <<'EOF'
-[Unit]
-Description=Incident Commander Game Server
-After=network.target
-
-[Service]
-Type=simple
-User=$(shell whoami)
-WorkingDirectory=$(shell pwd)
-ExecStart=$(shell pwd)/incident-commander-server
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
+	@echo "[Unit]" | sudo tee /etc/systemd/system/incident-commander.service > /dev/null
+	@echo "Description=Incident Commander Game Server" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
+	@echo "After=network.target" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
+	@echo "[Service]" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
+	@echo "Type=simple" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
+	@echo "User=$$USER" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
+	@echo "WorkingDirectory=$$(pwd)" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
+	@echo "ExecStart=$$(pwd)/incident-commander-server" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
+	@echo "Restart=always" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
+	@echo "RestartSec=10" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
+	@echo "[Install]" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
+	@echo "WantedBy=multi-user.target" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
 	@sudo systemctl daemon-reload
 	@sudo systemctl enable incident-commander.service
 	@echo "✅ Service installed! Use 'make service-start' to start"
