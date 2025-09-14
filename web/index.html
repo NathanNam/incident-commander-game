@@ -233,6 +233,8 @@
                 justify-content: center;
                 align-items: center;
                 min-height: 0;
+                max-height: calc(100vh - 200px);
+                overflow: hidden;
             }
             
             #game-canvas-container {
@@ -241,11 +243,13 @@
                 display: flex;
                 justify-content: center;
                 align-items: center;
+                max-width: calc(100vw - 20px);
+                max-height: calc(100vh - 200px);
             }
             
             #game-canvas {
-                max-width: calc(100vw - 20px);
-                max-height: calc(100% - 10px);
+                max-width: calc(100vw - 40px);
+                max-height: calc(100vh - 200px);
                 width: auto;
                 height: auto;
                 aspect-ratio: 1;
@@ -667,21 +671,27 @@
                 const isMobile = window.innerWidth < 768;
                 
                 if (isMobile) {
-                    // Calculate optimal size for mobile
+                    // Calculate optimal size for mobile - more conservative sizing
                     const viewportWidth = window.innerWidth;
                     const viewportHeight = window.innerHeight;
                     const availableWidth = viewportWidth - 40; // Account for padding
-                    const availableHeight = viewportHeight - 180; // Account for title and controls
                     
+                    // Account for title (~70px) + controls (~120px) + padding
+                    const availableHeight = viewportHeight - 200;
+                    
+                    // Use smaller of width/height and cap at smaller size for mobile
                     const optimalSize = Math.min(availableWidth, availableHeight);
-                    const maxMobileSize = Math.min(optimalSize, 400); // Cap at 400px
+                    const maxMobileSize = Math.min(optimalSize, 320); // Smaller cap for mobile
                     
-                    canvas.style.width = maxMobileSize + 'px';
-                    canvas.style.height = maxMobileSize + 'px';
+                    // Ensure minimum size
+                    const finalSize = Math.max(maxMobileSize, 250);
+                    
+                    canvas.style.width = finalSize + 'px';
+                    canvas.style.height = finalSize + 'px';
                     
                     // Set canvas resolution
-                    canvas.width = maxMobileSize;
-                    canvas.height = maxMobileSize;
+                    canvas.width = finalSize;
+                    canvas.height = finalSize;
                 } else {
                     // Desktop sizing - wait for container to be sized
                     setTimeout(() => {
