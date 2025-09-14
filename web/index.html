@@ -33,10 +33,13 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #1a1f36 0%, #2a3f5f 100%);
             color: white;
+            margin: 0;
+            padding: 0;
             overflow: hidden; /* Prevent scrolling */
             position: fixed;
             width: 100%;
-            height: 100%;
+            height: 100vh;
+            touch-action: none; /* Prevent scrolling while playing */
             /* iOS safe area support */
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
@@ -185,68 +188,119 @@
         
         /* Mobile layout - stack vertically */
         @media (max-width: 767px) {
+            :root {
+                --vh: 1vh;
+            }
+            
+            body {
+                height: 100vh;
+                height: calc(var(--vh, 1vh) * 100); /* iOS Safari fix */
+            }
+            
             #game-container {
                 padding: 0;
+                height: 100vh;
+                height: calc(var(--vh, 1vh) * 100);
+                display: flex;
+                flex-direction: column;
             }
             
             #game-title {
-                padding: 10px 15px;
+                padding: 8px 15px;
+                flex-shrink: 0;
             }
             
             #game-title h1 {
-                font-size: 24px;
-                gap: 8px;
+                font-size: 20px;
+                gap: 6px;
+            }
+            
+            .title-icon {
+                font-size: 22px;
             }
             
             #game-main {
                 flex-direction: column;
+                flex: 1;
+                min-height: 0;
                 gap: 0;
             }
             
             #game-area {
-                padding: 10px;
                 flex: 1;
+                padding: 10px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 0;
+            }
+            
+            #game-canvas-container {
+                width: 100%;
+                height: 100%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            
+            #game-canvas {
+                max-width: calc(100vw - 20px);
+                max-height: calc(100% - 10px);
+                width: auto;
+                height: auto;
+                aspect-ratio: 1;
+                object-fit: contain;
             }
             
             #game-sidebar {
                 width: 100%;
                 flex-direction: row;
-                padding: 8px 10px;
-                gap: 8px;
+                padding: 6px 10px;
+                gap: 6px;
                 justify-content: space-between;
                 align-items: flex-start;
                 background: rgba(0, 0, 0, 0.4);
                 border-top: 1px solid #2a3f5f;
                 border-right: none;
+                flex-shrink: 0;
             }
             
             #score-panel {
                 flex: 1;
-                margin-right: 8px;
-                padding: 10px;
+                margin-right: 6px;
+                padding: 8px;
+                gap: 8px;
             }
             
             #score-panel span {
-                font-size: 14px;
+                font-size: 12px;
             }
             
             #controls {
                 flex: 2;
-                padding: 8px;
+                padding: 6px;
+                gap: 6px;
+            }
+            
+            .control-row {
+                gap: 8px;
             }
             
             .control-btn {
-                width: 38px;
-                height: 38px;
-                font-size: 16px;
+                width: 36px;
+                height: 36px;
+                font-size: 14px;
+                min-width: 36px;
+                min-height: 36px;
             }
             
             #game-state {
                 writing-mode: vertical-rl;
                 text-orientation: mixed;
-                font-size: 12px;
+                font-size: 10px;
                 align-self: center;
-                margin: 0 8px;
+                margin: 0 6px;
+                min-width: 20px;
             }
             
             .keyboard-info {
@@ -256,12 +310,63 @@
         
         /* Desktop styles */
         @media (min-width: 768px) {
+            body {
+                height: 100vh;
+            }
+            
+            #game-container {
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+            
             #game-main {
-                flex-direction: row; /* Keep sidebar layout on desktop */
+                flex-direction: row; /* Sidebar on left, canvas on right */
+                flex: 1;
+                min-height: 0;
             }
             
             #game-sidebar {
-                width: 220px; /* Slightly wider on desktop */
+                width: 220px;
+                flex-direction: column;
+                padding: 20px;
+                gap: 20px;
+                background: rgba(0, 0, 0, 0.3);
+                border-right: 2px solid #2a3f5f;
+                border-top: none;
+            }
+            
+            #game-area {
+                flex: 1;
+                padding: 20px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            
+            #game-canvas-container {
+                width: 100%;
+                height: 100%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            
+            #game-canvas {
+                max-width: 600px;
+                max-height: 600px;
+                width: auto;
+                height: auto;
+            }
+            
+            #score-panel {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 8px;
+                padding: 15px;
+                border: 1px solid #2a3f5f;
             }
             
             #score-panel span {
@@ -270,6 +375,20 @@
             
             #game-state {
                 font-size: 18px;
+                text-align: center;
+                writing-mode: initial;
+                text-orientation: initial;
+                margin: 0;
+            }
+            
+            #controls {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 8px;
+                padding: 15px;
+                border: 1px solid #2a3f5f;
             }
             
             .control-btn {
@@ -278,9 +397,8 @@
                 font-size: 20px;
             }
             
-            #game-canvas {
-                max-width: 600px;
-                max-height: 600px;
+            .keyboard-info {
+                display: block;
             }
         }
         
@@ -499,6 +617,11 @@
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('game-container').style.display = 'flex';
                 
+                // Optimize canvas after showing game container
+                setTimeout(() => {
+                    optimizeCanvas();
+                }, 100);
+                
                 console.log('Running WebAssembly module...');
                 // Run the WebAssembly module
                 go.run(result.instance);
@@ -535,21 +658,69 @@
             e.preventDefault();
         }, { passive: false });
         
-        // Handle device orientation changes
+        // Canvas optimization for both mobile and desktop
+        function optimizeCanvas() {
+            const canvas = document.getElementById('game-canvas');
+            const container = document.getElementById('game-canvas-container');
+            
+            if (canvas && container) {
+                const isMobile = window.innerWidth < 768;
+                
+                if (isMobile) {
+                    // Calculate optimal size for mobile
+                    const viewportWidth = window.innerWidth;
+                    const viewportHeight = window.innerHeight;
+                    const availableWidth = viewportWidth - 40; // Account for padding
+                    const availableHeight = viewportHeight - 180; // Account for title and controls
+                    
+                    const optimalSize = Math.min(availableWidth, availableHeight);
+                    const maxMobileSize = Math.min(optimalSize, 400); // Cap at 400px
+                    
+                    canvas.style.width = maxMobileSize + 'px';
+                    canvas.style.height = maxMobileSize + 'px';
+                    
+                    // Set canvas resolution
+                    canvas.width = maxMobileSize;
+                    canvas.height = maxMobileSize;
+                } else {
+                    // Desktop sizing - wait for container to be sized
+                    setTimeout(() => {
+                        const containerRect = container.getBoundingClientRect();
+                        const availableWidth = containerRect.width * 0.9;
+                        const availableHeight = containerRect.height * 0.9;
+                        const size = Math.min(availableWidth, availableHeight, 600);
+                        
+                        if (size > 0) {
+                            canvas.style.width = size + 'px';
+                            canvas.style.height = size + 'px';
+                            
+                            // Set canvas resolution
+                            canvas.width = size;
+                            canvas.height = size;
+                        }
+                    }, 100);
+                }
+            }
+        }
+        
+        // Handle device orientation changes and resize
         window.addEventListener('orientationchange', function() {
             setTimeout(() => {
-                // Force a canvas resize if needed
-                const canvas = document.getElementById('game-canvas');
-                if (canvas) {
-                    const container = document.getElementById('game-canvas-container');
-                    const maxWidth = Math.min(container.clientWidth * 0.9, 600);
-                    const maxHeight = Math.min(container.clientHeight * 0.9, 600);
-                    const size = Math.min(maxWidth, maxHeight);
-                    
-                    canvas.style.width = size + 'px';
-                    canvas.style.height = size + 'px';
-                }
-            }, 100);
+                optimizeCanvas();
+                // Force viewport height recalculation on iOS
+                document.documentElement.style.setProperty('--vh', window.innerHeight * 0.01 + 'px');
+            }, 200);
+        });
+        
+        window.addEventListener('resize', function() {
+            setTimeout(optimizeCanvas, 150);
+        });
+        
+        // Initialize canvas optimizations when DOM is ready
+        window.addEventListener('DOMContentLoaded', function() {
+            setTimeout(optimizeCanvas, 200);
+            // Set initial viewport height for iOS
+            document.documentElement.style.setProperty('--vh', window.innerHeight * 0.01 + 'px');
         });
     </script>
 </body>
