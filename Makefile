@@ -226,21 +226,21 @@ stop-daemon:
 # Install systemd service (Ubuntu)
 install-service: build-ubuntu
 	@echo "🔧 Installing systemd service..."
-	@sudo tee /etc/systemd/system/incident-commander.service > /dev/null <<EOF \
-[Unit]\
-Description=Incident Commander Game Server\
-After=network.target\
-\
-[Service]\
-Type=simple\
-User=$$USER\
-WorkingDirectory=$$(pwd)\
-ExecStart=$$(pwd)/incident-commander-server\
-Restart=always\
-RestartSec=10\
-\
-[Install]\
-WantedBy=multi-user.target\
+	@sudo tee /etc/systemd/system/incident-commander.service > /dev/null <<'EOF'
+[Unit]
+Description=Incident Commander Game Server
+After=network.target
+
+[Service]
+Type=simple
+User=$(shell whoami)
+WorkingDirectory=$(shell pwd)
+ExecStart=$(shell pwd)/incident-commander-server
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
 EOF
 	@sudo systemctl daemon-reload
 	@sudo systemctl enable incident-commander.service
