@@ -1,0 +1,18 @@
+# Environment variables (contains sensitive credentials)
+.env
+
+# Build artifacts
+web/static/game.wasm
+web/static/wasm_exec.js
+incident-commander-server
+
+# Runtime files
+incident-commander.log
+incident-commander.pid
+
+# macOS
+.DS_Store
+
+# Go
+*.test
+*.out
