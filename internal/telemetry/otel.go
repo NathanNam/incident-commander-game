@@ -29,16 +29,16 @@ var (
 	appLogger *slog.Logger
 )
 
-// parseOTLPEndpoint parses the OTLP endpoint URL and returns the host and whether to use HTTPS
-func parseOTLPEndpoint(endpoint string) (host string, useHTTPS bool, err error) {
+// parseOTLPEndpoint parses the OTLP endpoint URL and returns the host, base path, and whether to use HTTPS
+func parseOTLPEndpoint(endpoint string) (host string, basePath string, useHTTPS bool, err error) {
 	// If no protocol is specified, assume localhost:port format
 	if !strings.Contains(endpoint, "://") {
-		return endpoint, false, nil
+		return endpoint, "", false, nil
 	}
 
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		return "", false, err
+		return "", "", false, err
 	}
 
 	host = u.Host
@@ -50,8 +50,10 @@ func parseOTLPEndpoint(endpoint string) (host string, useHTTPS bool, err error) 
 		}
 	}
 
+	// Preserve the path (e.g., "/v2/otel" for Observe)
+	basePath = strings.TrimSuffix(u.Path, "/")
 	useHTTPS = u.Scheme == "https"
-	return host, useHTTPS, nil
+	return host, basePath, useHTTPS, nil
 }
 
 // buildOTLPHeaders creates the standard headers for OTLP exporters.
@@ -67,15 +69,16 @@ func buildOTLPHeaders(targetPackage, bearerToken string) map[string]string {
 
 // setupTracing configures OpenTelemetry tracing with OTLP HTTP exporter.
 func setupTracing(ctx context.Context, res *resource.Resource, otlpEndpoint, bearerToken string) (*sdktrace.TracerProvider, error) {
-	host, useHTTPS, err := parseOTLPEndpoint(otlpEndpoint)
+	host, basePath, useHTTPS, err := parseOTLPEndpoint(otlpEndpoint)
 	if err != nil {
 		return nil, err
 	}
 
 	headers := buildOTLPHeaders("Tracing", bearerToken)
+	urlPath := basePath + "/v1/traces"
 	options := []otlptracehttp.Option{
 		otlptracehttp.WithEndpoint(host),
-		otlptracehttp.WithURLPath("/v1/traces"),
+		otlptracehttp.WithURLPath(urlPath),
 		otlptracehttp.WithHeaders(headers),
 	}
 
@@ -99,15 +102,16 @@ func setupTracing(ctx context.Context, res *resource.Resource, otlpEndpoint, bea
 
 // setupMetrics configures OpenTelemetry metrics with OTLP HTTP exporter.
 func setupMetrics(ctx context.Context, res *resource.Resource, otlpEndpoint, bearerToken string) (*sdkmetric.MeterProvider, error) {
-	host, useHTTPS, err := parseOTLPEndpoint(otlpEndpoint)
+	host, basePath, useHTTPS, err := parseOTLPEndpoint(otlpEndpoint)
 	if err != nil {
 		return nil, err
 	}
 
 	headers := buildOTLPHeaders("Metrics", bearerToken)
+	urlPath := basePath + "/v1/metrics"
 	options := []otlpmetrichttp.Option{
 		otlpmetrichttp.WithEndpoint(host),
-		otlpmetrichttp.WithURLPath("/v1/metrics"),
+		otlpmetrichttp.WithURLPath(urlPath),
 		otlpmetrichttp.WithHeaders(headers),
 	}
 
@@ -131,15 +135,16 @@ func setupMetrics(ctx context.Context, res *resource.Resource, otlpEndpoint, bea
 
 // setupLogging configures OpenTelemetry logging with OTLP HTTP exporter and structured logging.
 func setupLogging(ctx context.Context, res *resource.Resource, otlpEndpoint, bearerToken, serviceName string) (*sdklog.LoggerProvider, error) {
-	host, useHTTPS, err := parseOTLPEndpoint(otlpEndpoint)
+	host, basePath, useHTTPS, err := parseOTLPEndpoint(otlpEndpoint)
 	if err != nil {
 		return nil, err
 	}
 
 	headers := buildOTLPHeaders("Logs", bearerToken)
+	urlPath := basePath + "/v1/logs"
 	options := []otlploghttp.Option{
 		otlploghttp.WithEndpoint(host),
-		otlploghttp.WithURLPath("/v1/logs"),
+		otlploghttp.WithURLPath(urlPath),
 		otlploghttp.WithHeaders(headers),
 	}
 
