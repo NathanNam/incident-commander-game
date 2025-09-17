@@ -5,7 +5,7 @@ import (
 	"syscall/js"
 	"time"
 
-	"github.com/nathannam/incident-commander-game/internal/game"
+	"github.com/NathanNam/incident-commander-game/internal/game"
 )
 
 // InputHandler manages input events

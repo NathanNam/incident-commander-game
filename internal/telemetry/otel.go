@@ -1,4 +1,4 @@
-package main
+package telemetry
 
 import (
 	"context"
@@ -108,9 +108,9 @@ func setupLogging(ctx context.Context, res *resource.Resource, otlpEndpoint, bea
 	return lp, nil
 }
 
-// setupInstrumentation initializes OpenTelemetry with tracing, metrics, and logging.
+// SetupInstrumentation initializes OpenTelemetry with tracing, metrics, and logging.
 // Returns a cleanup function that should be called before application shutdown.
-func setupInstrumentation(serviceName string) func() {
+func SetupInstrumentation(serviceName string) func() {
 	ctx := context.Background()
 
 	// Get OTLP endpoint from environment or use default
@@ -178,19 +178,19 @@ func setupInstrumentation(serviceName string) func() {
 }
 
 // GetTracer returns the global tracer instance.
-// Call setupInstrumentation first.
+// Call SetupInstrumentation first.
 func GetTracer() trace.Tracer {
 	return appTracer
 }
 
 // GetMeter returns the global meter instance.
-// Call setupInstrumentation first.
+// Call SetupInstrumentation first.
 func GetMeter() metric.Meter {
 	return appMeter
 }
 
 // GetLogger returns the global structured logger instance.
-// Call setupInstrumentation first.
+// Call SetupInstrumentation first.
 func GetLogger() *slog.Logger {
 	return appLogger
 }

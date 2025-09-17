@@ -6,7 +6,7 @@ import (
 	"syscall/js"
 	"time"
 
-	"github.com/nathannam/incident-commander-game/internal/game"
+	"github.com/NathanNam/incident-commander-game/internal/game"
 )
 
 // Renderer handles canvas drawing operations

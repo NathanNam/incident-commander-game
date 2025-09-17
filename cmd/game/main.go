@@ -5,9 +5,9 @@ import (
 	"syscall/js"
 	"time"
 
-	"github.com/nathannam/incident-commander-game/internal/game"
-	"github.com/nathannam/incident-commander-game/internal/input"
-	"github.com/nathannam/incident-commander-game/internal/renderer"
+	"github.com/NathanNam/incident-commander-game/internal/game"
+	"github.com/NathanNam/incident-commander-game/internal/input"
+	"github.com/NathanNam/incident-commander-game/internal/renderer"
 )
 
 // Game metrics and telemetry

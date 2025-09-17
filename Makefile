@@ -164,6 +164,7 @@ build-prod: setup
 	@GOROOT=$$(go env GOROOT); \
 	if [ -f "$$GOROOT/misc/wasm/wasm_exec.js" ]; then \
 		cp "$$GOROOT/misc/wasm/wasm_exec.js" web/static/; \
+		echo "✅ Found wasm_exec.js at $$GOROOT/misc/wasm/"; \
 	else \
 		echo "⚠️  wasm_exec.js not found at $$GOROOT/misc/wasm/"; \
 		echo "🔍 Checking alternative locations..."; \
@@ -174,9 +175,18 @@ build-prod: setup
 			cp "/opt/homebrew/lib/go/misc/wasm/wasm_exec.js" web/static/; \
 			echo "✅ Found wasm_exec.js at /opt/homebrew/lib/go/misc/wasm/"; \
 		else \
-			echo "❌ wasm_exec.js not found. Please check your Go installation."; \
-			echo "💡 You can download it from: https://github.com/golang/go/raw/master/misc/wasm/wasm_exec.js"; \
-			exit 1; \
+			echo "🌐 Downloading wasm_exec.js from Go repository..."; \
+			if command -v curl >/dev/null 2>&1; then \
+				curl -sSL https://raw.githubusercontent.com/golang/go/master/misc/wasm/wasm_exec.js -o web/static/wasm_exec.js; \
+				echo "✅ Downloaded wasm_exec.js successfully"; \
+			elif command -v wget >/dev/null 2>&1; then \
+				wget -q https://raw.githubusercontent.com/golang/go/master/misc/wasm/wasm_exec.js -O web/static/wasm_exec.js; \
+				echo "✅ Downloaded wasm_exec.js successfully"; \
+			else \
+				echo "❌ Neither curl nor wget available. Please install one or manually download:"; \
+				echo "💡 https://raw.githubusercontent.com/golang/go/master/misc/wasm/wasm_exec.js"; \
+				exit 1; \
+			fi; \
 		fi; \
 	fi
 	@echo "✅ Production build complete!"
