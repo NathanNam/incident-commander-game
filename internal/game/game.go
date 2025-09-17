@@ -1,7 +1,9 @@
 package game
 
 import (
+	"fmt"
 	"math/rand"
+	"syscall/js"
 	"time"
 )
 
@@ -32,47 +34,70 @@ const (
 
 // Game represents the main game structure
 type Game struct {
-	Width, Height    int
-	Commander        Position
-	Trail            []Position
-	Alerts           []Position
-	Obstacles        []Position
-	Direction        Direction
-	State            GameState
-	Score            int
-	Level            int
-	AlertsCollected  int
-	AlertsNeeded     int
-	StartTime        time.Time
-	LastUpdate       time.Time
+	Width, Height     int
+	Commander         Position
+	Trail             []Position
+	Alerts            []Position
+	Obstacles         []Position
+	Direction         Direction
+	State             GameState
+	Score             int
+	Level             int
+	AlertsCollected   int
+	AlertsNeeded      int
+	StartTime         time.Time
+	LastUpdate        time.Time
 	LevelCompleteTime time.Time // Time when level was completed
+
+	// Instrumentation fields
+	moveCount       int64
+	collisionChecks int64
+	alertsSpawned   int64
+	gameOverCount   int64
+}
+
+// logGameMetric logs a game metric to console for observability
+func (g *Game) logGameMetric(metric string, value interface{}, context string) {
+	if js.Global().Get("console").Truthy() {
+		js.Global().Get("console").Call("log",
+			fmt.Sprintf("[GAME_METRIC] %s: %v - Level: %d, Score: %d, Context: %s",
+				metric, value, g.Level, g.Score, context))
+	}
 }
 
 // New creates a new game instance
 func New(width, height int) *Game {
 	rand.Seed(time.Now().UnixNano())
-	
+
 	g := &Game{
-		Width:     width,
-		Height:    height,
-		Commander: Position{X: width / 2, Y: height / 2},
-		Trail:     make([]Position, 0),
-		Alerts:    make([]Position, 0),
-		Obstacles: make([]Position, 0),
-		Direction: Right,
-		State:     Playing,
-		Score:     0,
-		Level:     1,
-		AlertsCollected: 0,
+		Width:             width,
+		Height:            height,
+		Commander:         Position{X: width / 2, Y: height / 2},
+		Trail:             make([]Position, 0),
+		Alerts:            make([]Position, 0),
+		Obstacles:         make([]Position, 0),
+		Direction:         Right,
+		State:             Playing,
+		Score:             0,
+		Level:             1,
+		AlertsCollected:   0,
 		AlertsNeeded:      5,
 		StartTime:         time.Now(),
 		LastUpdate:        time.Now(),
 		LevelCompleteTime: time.Time{}, // Initialize to zero time
+
+		// Initialize instrumentation counters
+		moveCount:       0,
+		collisionChecks: 0,
+		alertsSpawned:   0,
+		gameOverCount:   0,
 	}
-	
+
+	g.logGameMetric("game_created", fmt.Sprintf("%dx%d", width, height), "New game instance")
+
 	g.spawnAlerts()
 	g.setupLevel()
-	
+
 	return g
 }
 
@@ -91,7 +116,7 @@ func (g *Game) Update() {
 
 	// Move commander
 	g.moveCommander()
-	
+
 	// Check collisions
 	g.checkCollisions()
 }
@@ -100,7 +125,7 @@ func (g *Game) Update() {
 func (g *Game) moveCommander() {
 	// Add current position to trail
 	g.Trail = append(g.Trail, g.Commander)
-	
+
 	// Move commander
 	switch g.Direction {
 	case Up:
@@ -112,33 +137,54 @@ func (g *Game) moveCommander() {
 	case Right:
 		g.Commander.X++
 	}
+
+	// Track movement metrics
+	g.moveCount++
+
+	// Log movement metrics every 100 moves
+	if g.moveCount%100 == 0 {
+		g.logGameMetric("moves_total", g.moveCount, "Commander movement tracking")
+		g.logGameMetric("trail_length", len(g.Trail), "Current trail size")
+	}
 }
 
 // checkCollisions checks for wall, trail, and alert collisions
 func (g *Game) checkCollisions() {
+	g.collisionChecks++
+
 	// Wall collision
 	if g.Commander.X < 0 || g.Commander.X >= g.Width ||
 		g.Commander.Y < 0 || g.Commander.Y >= g.Height {
 		g.State = GameOver
+		g.gameOverCount++
+		g.logGameMetric("game_over", "wall_collision",
+			fmt.Sprintf("Commander hit wall at (%d,%d)", g.Commander.X, g.Commander.Y))
 		return
 	}
-	
+
 	// Trail collision (self-collision)
 	for _, segment := range g.Trail {
 		if g.Commander.X == segment.X && g.Commander.Y == segment.Y {
 			g.State = GameOver
+			g.gameOverCount++
+			g.logGameMetric("game_over", "self_collision",
+				fmt.Sprintf("Commander hit trail at (%d,%d), trail length: %d",
+					g.Commander.X, g.Commander.Y, len(g.Trail)))
 			return
 		}
 	}
-	
+
 	// Obstacle collision
 	for _, obstacle := range g.Obstacles {
 		if g.Commander.X == obstacle.X && g.Commander.Y == obstacle.Y {
 			g.State = GameOver
+			g.gameOverCount++
+			g.logGameMetric("game_over", "obstacle_collision",
+				fmt.Sprintf("Commander hit obstacle at (%d,%d)", g.Commander.X, g.Commander.Y))
 			return
 		}
 	}
-	
+
 	// Alert collision
 	for i, alert := range g.Alerts {
 		if g.Commander.X == alert.X && g.Commander.Y == alert.Y {
@@ -146,20 +192,33 @@ func (g *Game) checkCollisions() {
 			break
 		}
 	}
+
+	// Log collision check metrics every 1000 checks
+	if g.collisionChecks%1000 == 0 {
+		g.logGameMetric("collision_checks_total", g.collisionChecks, "Collision detection performance")
+	}
 }
 
 // collectAlert handles alert collection
 func (g *Game) collectAlert(index int) {
+	alertPos := g.Alerts[index]
+
 	// Remove the collected alert
 	g.Alerts = append(g.Alerts[:index], g.Alerts[index+1:]...)
-	
+
 	// Increase score
 	basePoints := 10
 	comboMultiplier := g.AlertsCollected + 1
-	g.Score += basePoints * comboMultiplier
-	
+	pointsEarned := basePoints * comboMultiplier
+	g.Score += pointsEarned
+
 	g.AlertsCollected++
-	
+
+	// Log alert collection
+	g.logGameMetric("alert_collected", pointsEarned,
+		fmt.Sprintf("Alert at (%d,%d), combo: %dx, total collected: %d/%d",
+			alertPos.X, alertPos.Y, comboMultiplier, g.AlertsCollected, g.AlertsNeeded))
+
 	// Spawn a new alert
 	g.spawnAlerts()
 }
@@ -169,11 +228,18 @@ func (g *Game) checkLevelComplete() {
 	if g.AlertsCollected >= g.AlertsNeeded {
 		if g.State != LevelComplete {
 			g.State = LevelComplete
-			
+
 			// Level completion bonus
-			timeBonus := max(0, 60-int(time.Since(g.StartTime).Seconds()))
-			g.Score += (100 * g.Level) + timeBonus
-			
+			levelTime := time.Since(g.StartTime)
+			timeBonus := max(0, 60-int(levelTime.Seconds()))
+			bonusPoints := (100 * g.Level) + timeBonus
+			g.Score += bonusPoints
+
+			// Log level completion
+			g.logGameMetric("level_complete", g.Level,
+				fmt.Sprintf("Time: %.2fs, Bonus: %d points, Total score: %d",
+					levelTime.Seconds(), bonusPoints, g.Score))
+
 			// Set a timer to advance to next level after a brief pause
 			g.LevelCompleteTime = time.Now()
 		} else {
@@ -189,37 +255,47 @@ func (g *Game) checkLevelComplete() {
 func (g *Game) nextLevel() {
 	if g.Level >= 10 {
 		// Game completed!
+		g.logGameMetric("game_complete", g.Score,
+			fmt.Sprintf("All 10 levels completed! Final score: %d", g.Score))
 		return
 	}
-	
+
+	prevLevel := g.Level
 	g.Level++
 	g.AlertsCollected = 0
 	// Progressive difficulty but keep it reasonable
-	g.AlertsNeeded = 5 + (g.Level-1) // Level 1: 5, Level 2: 6, ..., Level 10: 14
+	g.AlertsNeeded = 5 + (g.Level - 1) // Level 1: 5, Level 2: 6, ..., Level 10: 14
 	g.StartTime = time.Now()
 	g.State = Playing
-	
+
 	// Reset positions and clear trail for new level
 	g.Commander = Position{X: g.Width / 2, Y: g.Height / 2}
 	g.Trail = make([]Position, 0) // Reset trail for new level
-	
+
 	// Clear alerts and obstacles
 	g.Alerts = make([]Position, 0)
 	g.Obstacles = make([]Position, 0)
-	
+
 	// Setup new level
 	g.setupLevel()
-	
+
 	// Safety check: Remove any obstacles at commander spawn position
 	commanderPos := g.Commander
+	obstaclesRemoved := 0
 	for i := len(g.Obstacles) - 1; i >= 0; i-- {
 		if g.Obstacles[i].X == commanderPos.X && g.Obstacles[i].Y == commanderPos.Y {
 			// Remove obstacle that would collide with commander
 			g.Obstacles = append(g.Obstacles[:i], g.Obstacles[i+1:]...)
+			obstaclesRemoved++
 		}
 	}
-	
+
 	g.spawnAlerts()
+
+	// Log level advancement
+	g.logGameMetric("level_advanced", g.Level,
+		fmt.Sprintf("From level %d to %d, alerts needed: %d, obstacles: %d (removed %d from spawn)",
+			prevLevel, g.Level, g.AlertsNeeded, len(g.Obstacles), obstaclesRemoved))
 }
 
 // setupLevel configures obstacles and layout for the current level
@@ -239,18 +315,35 @@ func (g *Game) setupLevel() {
 
 // spawnAlerts spawns new alert bubbles
 func (g *Game) spawnAlerts() {
+	initialCount := len(g.Alerts)
+	attempts := 0
+
 	for len(g.Alerts) < 3 { // Keep 3 alerts on screen
+		attempts++
+		if attempts > 100 { // Prevent infinite loops
+			g.logGameMetric("spawn_alert_failed", attempts, "Too many spawn attempts, breaking")
+			break
+		}
+
 		for {
 			x := rand.Intn(g.Width)
 			y := rand.Intn(g.Height)
 			pos := Position{X: x, Y: y}
-			
+
 			// Don't spawn on commander, trail, or obstacles
 			if !g.isPositionOccupied(pos) {
 				g.Alerts = append(g.Alerts, pos)
+				g.alertsSpawned++
 				break
 			}
 		}
+	}
+
+	// Log alert spawning if any were created
+	if len(g.Alerts) > initialCount {
+		g.logGameMetric("alerts_spawned", len(g.Alerts)-initialCount,
+			fmt.Sprintf("Total alerts on screen: %d, total spawned: %d",
+				len(g.Alerts), g.alertsSpawned))
 	}
 }
 
@@ -260,21 +353,21 @@ func (g *Game) isPositionOccupied(pos Position) bool {
 	if g.Commander.X == pos.X && g.Commander.Y == pos.Y {
 		return true
 	}
-	
+
 	// Check trail
 	for _, segment := range g.Trail {
 		if segment.X == pos.X && segment.Y == pos.Y {
 			return true
 		}
 	}
-	
+
 	// Check obstacles
 	for _, obstacle := range g.Obstacles {
 		if obstacle.X == pos.X && obstacle.Y == pos.Y {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -282,7 +375,7 @@ func (g *Game) isPositionOccupied(pos Position) bool {
 func (g *Game) addStaticBarriers() {
 	// Add cross pattern with safe distance from center to avoid commander spawn
 	centerX, centerY := g.Width/2, g.Height/2
-	
+
 	// Create cross pattern with at least 3 cells gap from commander
 	// Horizontal barriers (top and bottom of screen)
 	for x := 2; x < g.Width-2; x++ {
@@ -292,13 +385,13 @@ func (g *Game) addStaticBarriers() {
 			if centerY-4 >= 0 {
 				g.Obstacles = append(g.Obstacles, Position{X: x, Y: centerY - 4})
 			}
-			// Bottom horizontal line  
+			// Bottom horizontal line
 			if centerY+4 < g.Height {
 				g.Obstacles = append(g.Obstacles, Position{X: x, Y: centerY + 4})
 			}
 		}
 	}
-	
+
 	// Vertical barriers (left and right sides)
 	for y := 2; y < g.Height-2; y++ {
 		// Skip area around commander spawn (leave 3x3 safe zone)
@@ -318,18 +411,18 @@ func (g *Game) addStaticBarriers() {
 // addRandomObstacles adds random obstacle positions
 func (g *Game) addRandomObstacles(count int) {
 	centerX, centerY := g.Width/2, g.Height/2
-	
+
 	for i := 0; i < count; i++ {
 		for attempts := 0; attempts < 50; attempts++ {
 			x := rand.Intn(g.Width)
 			y := rand.Intn(g.Height)
 			pos := Position{X: x, Y: y}
-			
+
 			// Don't place obstacles too close to commander spawn (maintain 3x3 safe zone)
 			if abs(x-centerX) <= 2 && abs(y-centerY) <= 2 {
 				continue
 			}
-			
+
 			if !g.isPositionOccupied(pos) {
 				g.Obstacles = append(g.Obstacles, pos)
 				break
@@ -342,19 +435,19 @@ func (g *Game) addRandomObstacles(count int) {
 func (g *Game) addMazeLayout() {
 	// Simple maze pattern that avoids commander spawn area
 	centerX, centerY := g.Width/2, g.Height/2
-	
+
 	for x := 2; x < g.Width-2; x += 4 {
 		for y := 2; y < g.Height-2; y += 4 {
 			pos := Position{X: x, Y: y}
-			
+
 			// Skip positions too close to commander spawn (maintain 3x3 safe zone)
 			if abs(x-centerX) <= 2 && abs(y-centerY) <= 2 {
 				continue
 			}
-			
+
 			if !g.isPositionOccupied(pos) {
 				g.Obstacles = append(g.Obstacles, pos)
-				
+
 				// Add connecting obstacle
 				var nextPos Position
 				if rand.Intn(2) == 0 {
@@ -362,11 +455,11 @@ func (g *Game) addMazeLayout() {
 				} else {
 					nextPos = Position{X: x, Y: y + 1}
 				}
-				
+
 				// Check the next position too - maintain safe zone
-				if nextPos.X < g.Width && nextPos.Y < g.Height && 
-				   !g.isPositionOccupied(nextPos) &&
-				   !(abs(nextPos.X-centerX) <= 2 && abs(nextPos.Y-centerY) <= 2) {
+				if nextPos.X < g.Width && nextPos.Y < g.Height &&
+					!g.isPositionOccupied(nextPos) &&
+					!(abs(nextPos.X-centerX) <= 2 && abs(nextPos.Y-centerY) <= 2) {
 					g.Obstacles = append(g.Obstacles, nextPos)
 				}
 			}
@@ -375,18 +468,18 @@ func (g *Game) addMazeLayout() {
 }
 
 // Public getters
-func (g *Game) GetCommander() Position { return g.Commander }
-func (g *Game) GetTrail() []Position { return g.Trail }
-func (g *Game) GetAlerts() []Position { return g.Alerts }
+func (g *Game) GetCommander() Position   { return g.Commander }
+func (g *Game) GetTrail() []Position     { return g.Trail }
+func (g *Game) GetAlerts() []Position    { return g.Alerts }
 func (g *Game) GetObstacles() []Position { return g.Obstacles }
-func (g *Game) GetScore() int { return g.Score }
-func (g *Game) GetLevel() int { return g.Level }
-func (g *Game) GetAlertsCollected() int { return g.AlertsCollected }
-func (g *Game) GetAlertsNeeded() int { return g.AlertsNeeded }
-func (g *Game) GetState() GameState { return g.State }
-func (g *Game) GetWidth() int { return g.Width }
-func (g *Game) GetHeight() int { return g.Height }
-func (g *Game) IsRunning() bool { return g.State == Playing }
+func (g *Game) GetScore() int            { return g.Score }
+func (g *Game) GetLevel() int            { return g.Level }
+func (g *Game) GetAlertsCollected() int  { return g.AlertsCollected }
+func (g *Game) GetAlertsNeeded() int     { return g.AlertsNeeded }
+func (g *Game) GetState() GameState      { return g.State }
+func (g *Game) GetWidth() int            { return g.Width }
+func (g *Game) GetHeight() int           { return g.Height }
+func (g *Game) IsRunning() bool          { return g.State == Playing }
 
 // Control methods
 func (g *Game) SetDirection(dir Direction) {
@@ -395,19 +488,26 @@ func (g *Game) SetDirection(dir Direction) {
 		Up: Down, Down: Up, Left: Right, Right: Left,
 	}
 	if g.Direction != opposite[dir] {
+		dirNames := map[Direction]string{Up: "Up", Down: "Down", Left: "Left", Right: "Right"}
 		g.Direction = dir
+		g.logGameMetric("direction_change", dirNames[dir],
+			fmt.Sprintf("Changed from %s to %s", dirNames[g.Direction], dirNames[dir]))
 	}
 }
 
 func (g *Game) Pause() {
 	if g.State == Playing {
 		g.State = Paused
+		g.logGameMetric("game_paused", time.Since(g.StartTime).Seconds(), "Game paused by player")
 	} else if g.State == Paused {
 		g.State = Playing
+		g.logGameMetric("game_resumed", time.Since(g.StartTime).Seconds(), "Game resumed by player")
 	}
 }
 
 func (g *Game) Restart() {
+	g.logGameMetric("game_restart", g.Level,
+		fmt.Sprintf("Game restarted at level %d with score %d", g.Level, g.Score))
 	*g = *New(g.Width, g.Height)
 }
 
