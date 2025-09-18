@@ -2,8 +2,6 @@
 .env
 
 # Build artifacts
-web/static/game.wasm
-web/static/wasm_exec.js
 incident-commander-server
 
 # Runtime files
