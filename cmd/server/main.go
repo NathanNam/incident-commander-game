@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -23,9 +24,11 @@ type HealthResponse struct {
 
 // Global metrics
 var (
-	requestCounter   metric.Int64Counter
-	requestDuration  metric.Float64Histogram
-	healthCheckCount metric.Int64Counter
+	requestCounter     metric.Int64Counter
+	requestDuration    metric.Float64Histogram
+	healthCheckCount   metric.Int64Counter
+	clientEventCounter metric.Int64Counter
+	gameMetricsGauge   metric.Float64Gauge
 )
 
 // healthCheckHandler handles health check requests
@@ -118,6 +121,155 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 	logger.InfoContext(ctx, "Index page served successfully")
 }
 
+// clientTelemetryEventsHandler handles client-side telemetry events
+func clientTelemetryEventsHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	logger := telemetry.GetLogger()
+	tracer := telemetry.GetTracer()
+
+	// Start span for processing client telemetry
+	ctx, span := tracer.Start(ctx, "process_client_telemetry_event")
+	defer span.End()
+
+	// Read request body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Failed to read request body")
+		logger.ErrorContext(ctx, "Failed to read telemetry event body", "error", err)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	// Parse client event
+	var clientEvent telemetry.ClientEvent
+	if err := json.Unmarshal(body, &clientEvent); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Failed to unmarshal client event")
+		logger.ErrorContext(ctx, "Failed to unmarshal client event", "error", err)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	// Extract correlation headers
+	sessionID := r.Header.Get("X-Session-ID")
+	correlationID := r.Header.Get("X-Correlation-ID")
+
+	// Add span attributes
+	span.SetAttributes(
+		attribute.String("client.event.type", clientEvent.Type),
+		attribute.String("client.session_id", sessionID),
+		attribute.String("client.correlation_id", correlationID),
+		attribute.Int("client.event.level", clientEvent.Level),
+		attribute.Int("client.event.score", clientEvent.Score),
+	)
+
+	// Log the client event with correlation info
+	logger.InfoContext(ctx, "Client telemetry event received",
+		"event_type", clientEvent.Type,
+		"session_id", sessionID,
+		"correlation_id", correlationID,
+		"level", clientEvent.Level,
+		"score", clientEvent.Score,
+		"data", clientEvent.Data,
+		"client_timestamp", clientEvent.Timestamp,
+	)
+
+	// Increment client event counter
+	clientEventCounter.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("event_type", clientEvent.Type),
+		attribute.String("session_id", sessionID),
+	))
+
+	// Record business metrics based on event type
+	switch clientEvent.Type {
+	case "level_change":
+		gameMetricsGauge.Record(ctx, float64(clientEvent.Level), metric.WithAttributes(
+			attribute.String("metric_type", "current_level"),
+			attribute.String("session_id", sessionID),
+		))
+	case "score_change":
+		gameMetricsGauge.Record(ctx, float64(clientEvent.Score), metric.WithAttributes(
+			attribute.String("metric_type", "current_score"),
+			attribute.String("session_id", sessionID),
+		))
+	case "game_start":
+		gameMetricsGauge.Record(ctx, 1, metric.WithAttributes(
+			attribute.String("metric_type", "game_sessions"),
+			attribute.String("session_id", sessionID),
+		))
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "received"})
+}
+
+// clientTelemetryMetricsHandler handles client-side metrics
+func clientTelemetryMetricsHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	logger := telemetry.GetLogger()
+	tracer := telemetry.GetTracer()
+
+	// Start span for processing client metrics
+	ctx, span := tracer.Start(ctx, "process_client_telemetry_metric")
+	defer span.End()
+
+	// Read request body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Failed to read request body")
+		logger.ErrorContext(ctx, "Failed to read telemetry metric body", "error", err)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	// Parse client metric
+	var clientMetric telemetry.ClientMetric
+	if err := json.Unmarshal(body, &clientMetric); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Failed to unmarshal client metric")
+		logger.ErrorContext(ctx, "Failed to unmarshal client metric", "error", err)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	// Extract correlation headers
+	sessionID := r.Header.Get("X-Session-ID")
+	correlationID := r.Header.Get("X-Correlation-ID")
+
+	// Add span attributes
+	span.SetAttributes(
+		attribute.String("client.metric.name", clientMetric.Name),
+		attribute.String("client.metric.type", clientMetric.Type),
+		attribute.Float64("client.metric.value", clientMetric.Value),
+		attribute.String("client.session_id", sessionID),
+		attribute.String("client.correlation_id", correlationID),
+	)
+
+	// Log the client metric
+	logger.InfoContext(ctx, "Client telemetry metric received",
+		"metric_name", clientMetric.Name,
+		"metric_type", clientMetric.Type,
+		"metric_value", clientMetric.Value,
+		"session_id", sessionID,
+		"correlation_id", correlationID,
+		"client_timestamp", clientMetric.Timestamp,
+	)
+
+	// Record the metric in our telemetry system
+	gameMetricsGauge.Record(ctx, clientMetric.Value, metric.WithAttributes(
+		attribute.String("metric_type", clientMetric.Name),
+		attribute.String("session_id", sessionID),
+		attribute.String("source", "client"),
+	))
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "received"})
+}
+
 func main() {
 	// Initialize OpenTelemetry
 	cleanup := telemetry.SetupInstrumentation("incident-commander-server")
@@ -145,12 +297,28 @@ func main() {
 		log.Fatal("Failed to create health check counter:", err)
 	}
 
+	clientEventCounter, err = meter.Int64Counter("client_events_total",
+		metric.WithDescription("Total number of client telemetry events received"))
+	if err != nil {
+		log.Fatal("Failed to create client event counter:", err)
+	}
+
+	gameMetricsGauge, err = meter.Float64Gauge("game_metrics",
+		metric.WithDescription("Various game-related metrics"))
+	if err != nil {
+		log.Fatal("Failed to create game metrics gauge:", err)
+	}
+
 	logger := telemetry.GetLogger()
 	logger.Info("OpenTelemetry metrics initialized")
 
 	// Set up instrumented routes
 	http.Handle("/", otelhttp.NewHandler(http.HandlerFunc(serveIndex), "GET /"))
 	http.Handle("/health", otelhttp.NewHandler(http.HandlerFunc(healthCheckHandler), "GET /health"))
+
+	// Client telemetry API endpoints
+	http.Handle("/api/telemetry/events", otelhttp.NewHandler(corsMiddleware(http.HandlerFunc(clientTelemetryEventsHandler)), "POST /api/telemetry/events"))
+	http.Handle("/api/telemetry/metrics", otelhttp.NewHandler(corsMiddleware(http.HandlerFunc(clientTelemetryMetricsHandler)), "POST /api/telemetry/metrics"))
 
 	// Serve static files with CORS headers and instrumentation
 	fileServer := http.FileServer(http.Dir("web/"))

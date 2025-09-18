@@ -8,14 +8,16 @@ import (
 	"github.com/NathanNam/incident-commander-game/internal/game"
 	"github.com/NathanNam/incident-commander-game/internal/input"
 	"github.com/NathanNam/incident-commander-game/internal/renderer"
+	"github.com/NathanNam/incident-commander-game/internal/telemetry"
 )
 
 // Game metrics and telemetry
 var (
-	gameStartTime time.Time
-	frameCount    int64
-	lastFPSReport time.Time
-	gameEvents    []GameEvent
+	gameStartTime   time.Time
+	frameCount      int64
+	lastFPSReport   time.Time
+	gameEvents      []GameEvent
+	clientTelemetry *telemetry.ClientTelemetry
 )
 
 // GameEvent represents a game event for telemetry
@@ -42,6 +44,22 @@ func logGameEvent(eventType string, level, score int, data string) {
 	js.Global().Get("console").Call("log",
 		fmt.Sprintf("[GAME_EVENT] %s - Level: %d, Score: %d, Data: %s",
 			eventType, level, score, data))
+
+	// Send to telemetry system with enhanced attributes
+	if clientTelemetry != nil {
+		attributes := map[string]interface{}{
+			"timestamp": event.Timestamp.Format(time.RFC3339),
+			"source":    "client_game",
+		}
+
+		// Add performance context
+		if eventType == "level_change" || eventType == "score_change" {
+			attributes["game_duration_seconds"] = time.Since(gameStartTime).Seconds()
+			attributes["frames_rendered"] = frameCount
+		}
+
+		clientTelemetry.LogEvent(eventType, level, score, data, attributes)
+	}
 }
 
 // reportPerformanceMetrics reports FPS and other performance metrics
@@ -55,14 +73,43 @@ func reportPerformanceMetrics(currentLevel int) {
 			fmt.Sprintf("[PERFORMANCE] FPS: %.2f, Level: %d, Frames: %d",
 				fps, currentLevel, frameCount))
 
+		// Send performance metrics to telemetry
+		if clientTelemetry != nil {
+			clientTelemetry.RecordMetric("fps", fps, "gauge", map[string]interface{}{
+				"level": currentLevel,
+				"game_duration_seconds": time.Since(gameStartTime).Seconds(),
+			})
+
+			clientTelemetry.RecordMetric("frames_rendered_total", float64(frameCount), "counter", map[string]interface{}{
+				"level": currentLevel,
+			})
+		}
+
 		frameCount = 0
 		lastFPSReport = now
 	}
 }
 
+// getCurrentServerURL gets the current server URL from the browser
+func getCurrentServerURL() string {
+	location := js.Global().Get("location")
+	protocol := location.Get("protocol").String()
+	hostname := location.Get("hostname").String()
+	port := location.Get("port").String()
+
+	if port != "" && port != "80" && port != "443" {
+		return protocol + "//" + hostname + ":" + port
+	}
+	return protocol + "//" + hostname
+}
+
 func main() {
 	gameStartTime = time.Now()
 	lastFPSReport = time.Now()
+
+	// Initialize client telemetry system
+	serverURL := getCurrentServerURL()
+	clientTelemetry = telemetry.NewClientTelemetry(serverURL)
 
 	println("🎮 Incident Commander WASM starting...")
 	logGameEvent("game_start", 0, 0, "WebAssembly initialization")
@@ -92,10 +139,16 @@ func main() {
 	println("✅ Canvas found, initializing game...")
 	logGameEvent("canvas_found", 0, 0, "Canvas element located successfully")
 
-	// Initialize game components
+	// Initialize game components with tracing
+	initSpan := clientTelemetry.StartSpan("game_initialization")
+	initSpan.SetAttribute("canvas_width", canvas.Get("width").Int())
+	initSpan.SetAttribute("canvas_height", canvas.Get("height").Int())
+
 	g := game.New(20, 20)
 	r := renderer.New(canvas)
 	inputHandler := input.New()
+
+	initSpan.End()
 
 	println("✅ Game components initialized")
 	logGameEvent("components_initialized", 1, 0, "Game, renderer, and input handler created")
@@ -131,6 +184,11 @@ func main() {
 		targetFPS := getTargetFPS(g.GetLevel())
 
 		if now-lastUpdate >= 1000.0/targetFPS {
+			// Start game loop span for performance tracking
+			loopSpan := clientTelemetry.StartSpan("game_loop_iteration")
+			loopSpan.SetAttribute("target_fps", targetFPS)
+			loopSpan.SetAttribute("frame_number", frameCount)
+
 			// Track previous state for event detection
 			prevLevel := g.GetLevel()
 			prevScore := g.GetScore()
@@ -141,6 +199,11 @@ func main() {
 			r.Render(g)
 			lastUpdate = now
 			frameCount++
+
+			// End the game loop span
+			loopSpan.SetAttribute("level", g.GetLevel())
+			loopSpan.SetAttribute("score", g.GetScore())
+			loopSpan.End()
 
 			// Check for state changes and log events
 			currentLevel := g.GetLevel()
