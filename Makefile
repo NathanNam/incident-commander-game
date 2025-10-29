@@ -161,37 +161,14 @@ build-prod: setup
 	@echo "🏗️  Building WebAssembly module (production)..."
 	@GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o web/static/game.wasm cmd/game/main.go
 	@echo "📋 Copying WebAssembly support files..."
-	@if [ -f "web/static/wasm_exec.js" ] && git ls-files --error-unmatch web/static/wasm_exec.js >/dev/null 2>&1; then \
-		echo "✅ Using committed wasm_exec.js (already in git)"; \
+	@GOROOT=$$(go env GOROOT); \
+	if [ -f "$$GOROOT/misc/wasm/wasm_exec.js" ]; then \
+		cp "$$GOROOT/misc/wasm/wasm_exec.js" web/static/; \
+	elif [ -f "/usr/local/go/misc/wasm/wasm_exec.js" ]; then \
+		cp "/usr/local/go/misc/wasm/wasm_exec.js" web/static/; \
 	else \
-		GOROOT=$$(go env GOROOT); \
-		if [ -f "$$GOROOT/misc/wasm/wasm_exec.js" ]; then \
-			cp "$$GOROOT/misc/wasm/wasm_exec.js" web/static/; \
-			echo "✅ Found wasm_exec.js at $$GOROOT/misc/wasm/"; \
-		else \
-			echo "⚠️  wasm_exec.js not found at $$GOROOT/misc/wasm/"; \
-			echo "🔍 Checking alternative locations..."; \
-			if [ -f "/usr/local/go/misc/wasm/wasm_exec.js" ]; then \
-				cp "/usr/local/go/misc/wasm/wasm_exec.js" web/static/; \
-				echo "✅ Found wasm_exec.js at /usr/local/go/misc/wasm/"; \
-			elif [ -f "/opt/homebrew/lib/go/misc/wasm/wasm_exec.js" ]; then \
-				cp "/opt/homebrew/lib/go/misc/wasm/wasm_exec.js" web/static/; \
-				echo "✅ Found wasm_exec.js at /opt/homebrew/lib/go/misc/wasm/"; \
-			else \
-				echo "🌐 Downloading wasm_exec.js from Go repository..."; \
-				if command -v curl >/dev/null 2>&1; then \
-					curl -sSL https://raw.githubusercontent.com/golang/go/master/misc/wasm/wasm_exec.js -o web/static/wasm_exec.js; \
-					echo "✅ Downloaded wasm_exec.js successfully"; \
-				elif command -v wget >/dev/null 2>&1; then \
-					wget -q https://raw.githubusercontent.com/golang/go/master/misc/wasm/wasm_exec.js -O web/static/wasm_exec.js; \
-					echo "✅ Downloaded wasm_exec.js successfully"; \
-				else \
-					echo "❌ Neither curl nor wget available. Please install one or manually download:"; \
-					echo "💡 https://raw.githubusercontent.com/golang/go/master/misc/wasm/wasm_exec.js"; \
-					exit 1; \
-				fi; \
-			fi; \
-		fi; \
+		echo "❌ wasm_exec.js not found"; \
+		exit 1; \
 	fi
 	@echo "✅ Production build complete!"
 
@@ -209,10 +186,9 @@ run-ubuntu: build-ubuntu
 	@./incident-commander-server
 
 # Run in background (daemon mode)
-run-daemon: build-ubuntu check-env
+run-daemon: build-ubuntu
 	@echo "🚀 Starting server in background..."
-	@set -a; source .env; set +a; \
-	nohup ./incident-commander-server > incident-commander.log 2>&1 & echo $$! > incident-commander.pid
+	@nohup ./incident-commander-server > incident-commander.log 2>&1 & echo $$! > incident-commander.pid
 	@echo "✅ Server started in background (PID: $$(cat incident-commander.pid))"
 	@echo "📋 Log file: incident-commander.log"
 	@echo "🔍 Check status: make status"
@@ -259,7 +235,6 @@ install-service: build-ubuntu
 	@echo "User=$$USER" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
 	@echo "WorkingDirectory=$$(pwd)" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
 	@echo "ExecStart=$$(pwd)/incident-commander-server" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
-	@echo "EnvironmentFile=-$$(pwd)/.env" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
 	@echo "Restart=always" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
 	@echo "RestartSec=10" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
 	@echo "" | sudo tee -a /etc/systemd/system/incident-commander.service > /dev/null
@@ -296,31 +271,12 @@ setup-firewall:
 	@echo "✅ Firewall configured (port 8080 open)"
 
 # Complete Ubuntu deployment
-deploy-ubuntu: ubuntu-deps check-env build-ubuntu install-service setup-firewall service-start
+deploy-ubuntu: ubuntu-deps build-ubuntu install-service setup-firewall service-start
 	@echo "🎉 Deployment complete!"
 	@echo "🌐 Game available at: http://$$(curl -s ifconfig.me):8080"
 	@echo "🔍 Health check: http://$$(curl -s ifconfig.me):8080/health"
 	@echo "📊 Service status: make service-status"
 	@echo "📋 View logs: make service-logs"
-
-# Check if .env file exists with required variables
-check-env:
-	@echo "🔍 Checking environment configuration..."
-	@if [ ! -f ".env" ]; then \
-		echo "❌ .env file not found!"; \
-		echo "📋 Please create .env file from .env.example:"; \
-		echo "   cp .env.example .env"; \
-		echo "   # Then edit .env with your actual values"; \
-		exit 1; \
-	fi
-	@if ! grep -q "OTEL_EXPORTER_OTLP_ENDPOINT=" .env || ! grep -q "OTEL_EXPORTER_OTLP_BEARER_TOKEN=" .env; then \
-		echo "❌ .env file missing required OpenTelemetry variables!"; \
-		echo "📋 Please ensure .env contains:"; \
-		echo "   OTEL_EXPORTER_OTLP_ENDPOINT=your-endpoint"; \
-		echo "   OTEL_EXPORTER_OTLP_BEARER_TOKEN=your-token"; \
-		exit 1; \
-	fi
-	@echo "✅ Environment configuration OK"
 
 # Clean deployment files
 clean-deploy:
