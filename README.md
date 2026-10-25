@@ -1,5 +1,7 @@
 # Incident Commander
 
+![Incident Commander](web/og.png)
+
 A retro arcade game about being on call. Steer the Incident Commander around the board, resolve every alert, and don't run into the trail of incidents you've already closed. Ten levels, each a little faster, with walls and mazes from level 3.
 
 **Play:** https://incident-commander-game.vercel.app
@@ -15,12 +17,13 @@ A retro arcade game about being on call. Steer the Incident Commander around the
 |---|---|---|
 | Move | Arrow keys or WASD | Swipe on the screen, or the arrow buttons |
 | Start / pause | Space, Enter or P | Tap the screen, or START |
-| Sound on/off | M | SOUND |
+| Sound: all → effects only → off | M | SOUND |
 | Back to the start screen | R | |
 
 - Each alert on a level is worth more than the last (10, 20, 30, …).
 - Clearing a level adds 100 × the level number, plus up to 60 for finishing fast.
-- Your best score is saved in your browser.
+- Your best score and sound setting are saved in your browser.
+- The music and sound effects are synthesised in the browser with Web Audio (`web/sound.js`): an original chiptune loop that speeds up each level, no audio files.
 
 ## How it works
 
@@ -32,7 +35,7 @@ cmd/server/        tiny static file server for playing locally
 internal/game/     rules: movement, collisions, scoring, levels (no browser code, unit-tested)
 internal/renderer/ draws the board on a <canvas> through syscall/js
 internal/sprites/  the pixel art (sprites.json), shared with the brand script
-web/               the site Vercel serves: index.html, game.wasm, wasm_exec.js, fonts, icons
+web/               the site Vercel serves: index.html, sound.js, game.wasm, wasm_exec.js, fonts, icons
 scripts/brand/     draws the favicon and share image from the sprites, and the README screenshots
 ```
 
@@ -53,4 +56,4 @@ make brand   # favicon + share image (Chrome + puppeteer-core)
 
 ## Credits
 
-Game and pixel art by [Nathan Nam](https://www.nathannam.com). Font: Press Start 2P (SIL Open Font License). Code under the Apache License 2.0 (see `LICENSE`).
+Game, pixel art and music by [Nathan Nam](https://www.nathannam.com); the hero is a pixel take on his on-call robot concept. Font: Press Start 2P (SIL Open Font License). Code under the Apache License 2.0 (see `LICENSE`).
