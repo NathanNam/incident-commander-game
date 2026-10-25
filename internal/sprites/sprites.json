@@ -1,0 +1,107 @@
+{
+  "_comment": "Pixel sprites, one string per row; letters are palette keys and '.' is transparent. The hero is a pixel take on Nathan's on-call robot concept: light-blue head, headset, beacon, green check. Read by the Go renderer (embedded) and by scripts/brand/make.mjs for the favicon and share image.",
+  "palette": {
+    "hero": {
+      "O": "#0b1430",
+      "H": "#a8e2f7",
+      "h": "#6fb4d6",
+      "m": "#4f93b8",
+      "B": "#1d2433",
+      "C": "#3ff0ff",
+      "E": "#0b1430",
+      "w": "#ffffff",
+      "M": "#ff7a8a",
+      "b": "#c9eefb",
+      "G": "#3ddc84",
+      "P": "#1d2433",
+      "K": "#0b1430",
+      "k": "#1d2433",
+      "c": "#a8e2f7"
+    },
+    "beacon": {
+      "alert": {
+        "S": "#ff4d4d",
+        "s": "#ffd0d0"
+      },
+      "dim": {
+        "S": "#8a1f2b",
+        "s": "#b04a55"
+      },
+      "calm": {
+        "S": "#3ddc84",
+        "s": "#d6ffe8"
+      },
+      "ready": {
+        "S": "#ffb020",
+        "s": "#fff0c2"
+      }
+    },
+    "alert": {
+      "O": "#3a0a10",
+      "R": "#ff4d4d",
+      "r": "#c22b36",
+      "W": "#ffffff"
+    },
+    "check": {
+      "G": "#d6ffe8"
+    }
+  },
+  "hero": [
+    "......SsSS......",
+    "......SSSS......",
+    ".......PP.......",
+    "....BBBBBBBB....",
+    "...BHHHHHHHHB...",
+    "..BHHHHHHHHHHB..",
+    ".CHHwEHHHHwEHHC.",
+    ".CHHEEHHHHEEHHC.",
+    ".CHHEEHHHHEEHHC.",
+    "..hHHHOMMOHHkk..",
+    "...OhhhhhhhhO...",
+    "...ObbbbbbbbO...",
+    "..bObbKKKGbbOb..",
+    "...ObbGKGKbbO...",
+    "...ObbKGKKbbO...",
+    "...OOOO..OOOO..."
+  ],
+  "heroOuch": [
+    "......SsSS......",
+    "......SSSS......",
+    ".......PP.......",
+    "....BBBBBBBB....",
+    "...BHHHHHHHHB...",
+    "..BHHHHHHHHHHB..",
+    ".CHHEHEHHEHEHHC.",
+    ".CHHHEHHHHEHHHC.",
+    ".CHHEHEHHEHEHHC.",
+    "..hHHHHOOHHHkk..",
+    "...OhhhhhhhhO...",
+    "...ObbbbbbbbO...",
+    "..bObbKKKGbbOb..",
+    "...ObbGKGKbbO...",
+    "...ObbKGKKbbO...",
+    "...OOOO..OOOO..."
+  ],
+  "alert": [
+    "....OO....",
+    "...ORRO...",
+    "...ORRO...",
+    "..ORWWRO..",
+    "..ORWWRO..",
+    ".ORRWWRRO.",
+    ".ORRRRRRO.",
+    "ORRRWWRRRO",
+    "OrrrrrrrrO",
+    "OOOOOOOOOO"
+  ],
+  "check": [
+    "........",
+    "......GG",
+    ".....GG.",
+    "GG..GG..",
+    ".GGGG...",
+    "..GG....",
+    "........",
+    "........"
+  ]
+}

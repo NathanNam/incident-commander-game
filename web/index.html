@@ -1,774 +1,231 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    
-    <!-- iOS-specific meta tags -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Incident Commander">
-    <meta name="theme-color" content="#1a1f36">
-    
-    <!-- Prevent iOS bounce/rubber-band effects -->
-    <meta name="format-detection" content="telephone=no">
-    <meta name="msapplication-tap-highlight" content="no">
-    
-    <title>🎮 Incident Commander Game</title>
-    
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            -khtml-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1a1f36 0%, #2a3f5f 100%);
-            color: white;
-            margin: 0;
-            padding: 0;
-            overflow: hidden; /* Prevent scrolling */
-            position: fixed;
-            width: 100%;
-            height: 100vh;
-            touch-action: none; /* Prevent scrolling while playing */
-            /* iOS safe area support */
-            padding-top: env(safe-area-inset-top);
-            padding-bottom: env(safe-area-inset-bottom);
-            padding-left: env(safe-area-inset-left);
-            padding-right: env(safe-area-inset-right);
-        }
-        
-        /* Prevent iOS rubber band effect */
-        body {
-            -webkit-overflow-scrolling: touch;
-            overscroll-behavior: none;
-        }
-        
-        #game-container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            max-height: 100vh;
-            width: 100vw;
-            max-width: 100vw;
-        }
-        
-        /* Main game area with sidebar layout */
-        #game-main {
-            display: flex;
-            flex: 1;
-            min-height: 0;
-        }
-        
-        /* Left sidebar for stats and controls */
-        #game-sidebar {
-            width: 200px;
-            background: rgba(0, 0, 0, 0.3);
-            border-right: 2px solid #2a3f5f;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            gap: 20px;
-        }
-        
-        /* Game canvas area */
-        #game-area {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        
-        /* Score panel in sidebar */
-        #score-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 8px;
-            padding: 15px;
-            border: 1px solid #2a3f5f;
-        }
-        
-        #score-panel span {
-            font-size: 16px;
-            font-weight: bold;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-            color: white;
-        }
-        
-        /* Game canvas in main area */
-        #game-canvas-container {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            max-width: 100%;
-            max-height: 100%;
-        }
-        
-        #game-canvas {
-            max-width: 100%;
-            max-height: 100%;
-            width: auto;
-            height: auto;
-            border: 2px solid #2a3f5f;
-            border-radius: 8px;
-            background: #1a1f36;
-            touch-action: none; /* Prevent default touch behaviors */
-        }
-        
-        /* Controls in sidebar */
-        #controls {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 8px;
-            padding: 15px;
-            border: 1px solid #2a3f5f;
-        }
-        
-        .control-row {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            align-items: center;
-        }
-        
-        .control-btn {
-            background: linear-gradient(145deg, #2a3f5f, #1a2a3f);
-            border: none;
-            border-radius: 50%;
-            width: 45px;
-            height: 45px;
-            color: white;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.1s ease;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            touch-action: manipulation;
-        }
-        
-        .control-btn:active {
-            background: linear-gradient(145deg, #1a2a3f, #2a3f5f);
-            transform: translateY(2px);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-        }
-        
-        .control-btn.wide {
-            width: 80px;
-            border-radius: 20px;
-        }
-        
-        /* Game state indicator */
-        #game-state {
-            font-size: 4vw;
-            font-weight: bold;
-            text-align: center;
-            margin-bottom: 5px;
-        }
-        
-        .playing { color: #6fcf3f; }
-        .paused { color: #ffd700; }
-        .game-over { color: #ff3838; }
-        .level-complete { color: #9dd9f3; }
-        
-        /* Mobile layout - stack vertically */
-        @media (max-width: 767px) {
-            :root {
-                --vh: 1vh;
-            }
-            
-            body {
-                height: 100vh;
-                height: calc(var(--vh, 1vh) * 100); /* iOS Safari fix */
-            }
-            
-            #game-container {
-                padding: 0;
-                height: 100vh;
-                height: calc(var(--vh, 1vh) * 100);
-                display: flex;
-                flex-direction: column;
-            }
-            
-            #game-title {
-                padding: 8px 15px;
-                flex-shrink: 0;
-            }
-            
-            #game-title h1 {
-                font-size: 20px;
-                gap: 6px;
-            }
-            
-            .title-icon {
-                font-size: 22px;
-            }
-            
-            #game-main {
-                flex-direction: column;
-                flex: 1;
-                min-height: 0;
-                gap: 0;
-            }
-            
-            #game-area {
-                flex: 1;
-                padding: 8px;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                min-height: 0;
-                max-height: calc(100vh - 250px);
-                overflow: hidden;
-            }
-            
-            #game-canvas-container {
-                width: 100%;
-                height: 100%;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                max-width: calc(100vw - 40px);
-                max-height: calc(100vh - 250px);
-            }
-            
-            #game-canvas {
-                max-width: 85vw;
-                max-height: calc(100vh - 200px);
-                width: auto;
-                height: auto;
-                aspect-ratio: 1;
-                object-fit: contain;
-                display: block;
-            }
-            
-            #game-sidebar {
-                width: 100%;
-                flex-direction: row;
-                padding: 6px 10px;
-                gap: 6px;
-                justify-content: space-between;
-                align-items: flex-start;
-                background: rgba(0, 0, 0, 0.4);
-                border-top: 1px solid #2a3f5f;
-                border-right: none;
-                flex-shrink: 0;
-            }
-            
-            #score-panel {
-                flex: 1;
-                margin-right: 6px;
-                padding: 8px;
-                gap: 8px;
-            }
-            
-            #score-panel span {
-                font-size: 12px;
-            }
-            
-            #controls {
-                flex: 2;
-                padding: 6px;
-                gap: 6px;
-            }
-            
-            .control-row {
-                gap: 8px;
-            }
-            
-            .control-btn {
-                width: 36px;
-                height: 36px;
-                font-size: 14px;
-                min-width: 36px;
-                min-height: 36px;
-            }
-            
-            #game-state {
-                writing-mode: vertical-rl;
-                text-orientation: mixed;
-                font-size: 10px;
-                align-self: center;
-                margin: 0 6px;
-                min-width: 20px;
-            }
-            
-            .keyboard-info {
-                display: none; /* Hide on mobile since touch controls are available */
-            }
-        }
-        
-        /* Desktop styles */
-        @media (min-width: 768px) {
-            body {
-                height: 100vh;
-            }
-            
-            #game-container {
-                height: 100vh;
-                display: flex;
-                flex-direction: column;
-            }
-            
-            #game-main {
-                flex-direction: row; /* Sidebar on left, canvas on right */
-                flex: 1;
-                min-height: 0;
-            }
-            
-            #game-sidebar {
-                width: 220px;
-                flex-direction: column;
-                padding: 20px;
-                gap: 20px;
-                background: rgba(0, 0, 0, 0.3);
-                border-right: 2px solid #2a3f5f;
-                border-top: none;
-            }
-            
-            #game-area {
-                flex: 1;
-                padding: 20px;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                position: relative;
-            }
-            
-            #game-canvas-container {
-                width: 100%;
-                height: 100%;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                position: relative;
-            }
-            
-            #game-canvas {
-                max-width: min(80vw, 800px);
-                max-height: min(80vh, 800px);
-                width: auto;
-                height: auto;
-                aspect-ratio: 1;
-                object-fit: contain;
-                display: block;
-                margin: 0 auto;
-                border: 2px solid #2a3f5f;
-                border-radius: 8px;
-                background: #1a1f36;
-            }
-            
-            #score-panel {
-                display: flex;
-                flex-direction: column;
-                gap: 15px;
-                background: rgba(0, 0, 0, 0.2);
-                border-radius: 8px;
-                padding: 15px;
-                border: 1px solid #2a3f5f;
-            }
-            
-            #score-panel span {
-                font-size: 16px;
-            }
-            
-            #game-state {
-                font-size: 18px;
-                text-align: center;
-                writing-mode: initial;
-                text-orientation: initial;
-                margin: 0;
-            }
-            
-            #controls {
-                display: flex;
-                flex-direction: column;
-                gap: 15px;
-                background: rgba(0, 0, 0, 0.2);
-                border-radius: 8px;
-                padding: 15px;
-                border: 1px solid #2a3f5f;
-            }
-            
-            .control-btn {
-                width: 50px;
-                height: 50px;
-                font-size: 20px;
-            }
-            
-            .keyboard-info {
-                display: block;
-            }
-        }
-        
-        /* Keyboard controls info in sidebar */
-        .keyboard-info {
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 8px;
-            padding: 15px;
-            border: 1px solid #2a3f5f;
-            font-size: 14px;
-            line-height: 1.5;
-            color: white;
-        }
-        
-        .keyboard-info strong {
-            color: #6fcf3f;
-            margin-bottom: 8px;
-            display: block;
-        }
-        
-        /* Hidden mascot image for preloading */
-        #mascot-img {
-            display: none !important;
-        }
-        
-        /* Loading state */
-        .loading {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            font-size: 24px;
-        }
-        
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #2a3f5f;
-            border-top: 4px solid #6fcf3f;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 20px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        /* Game title header */
-        #game-title {
-            background: linear-gradient(135deg, #1a1f36 0%, #2a3f5f 50%, #1a1f36 100%);
-            border-bottom: 2px solid #2a3f5f;
-            padding: 15px 20px;
-            text-align: center;
-            flex-shrink: 0;
-        }
-        
-        #game-title h1 {
-            margin: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            font-size: 5.5vw;
-            font-weight: 700;
-            color: white;
-            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7);
-        }
-        
-        .title-icon {
-            font-size: 6vw;
-            animation: pulse-alert 2s infinite;
-        }
-        
-        .title-text {
-            background: linear-gradient(135deg, #ffffff 0%, #e8f4fd 50%, #b8ddf2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            letter-spacing: 0.5px;
-        }
-        
-        
-        @keyframes pulse-alert {
-            0%, 100% { 
-                transform: scale(1);
-                opacity: 1;
-            }
-            50% { 
-                transform: scale(1.1);
-                opacity: 0.8;
-            }
-        }
-        
-        @media (min-width: 768px) {
-            #game-title h1 {
-                font-size: 28px;
-            }
-            
-            .title-icon {
-                font-size: 32px;
-            }
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<title>Incident Commander</title>
+<meta name="description" content="A retro arcade game about being on call: steer the Incident Commander, resolve every alert, and don't run into your own trail. Built with Go and WebAssembly.">
+<meta name="theme-color" content="#0e0a16">
+<link rel="canonical" href="https://incident-commander-game.vercel.app/">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Incident Commander">
+<meta property="og:title" content="Incident Commander">
+<meta property="og:description" content="A retro arcade game about being on call. Resolve every alert; don't run into your own trail.">
+<meta property="og:url" content="https://incident-commander-game.vercel.app/">
+<meta property="og:image" content="https://incident-commander-game.vercel.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Incident Commander: a pixel robot with a headset and a red beacon, on an arcade board of alerts and resolved checks">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:creator" content="@nathannam">
+<meta name="twitter:title" content="Incident Commander">
+<meta name="twitter:description" content="A retro arcade game about being on call. Resolve every alert; don't run into your own trail.">
+<meta name="twitter:image" content="https://incident-commander-game.vercel.app/og.png">
+<link rel="preload" href="/fonts/press-start-2p.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/game.wasm" as="fetch" type="application/wasm" crossorigin>
+<style>
+@font-face{font-family:"Press Start 2P";src:url(/fonts/press-start-2p.woff2) format("woff2");font-display:swap}
+:root{--bg:#0e0a16;--cab:#1b1428;--key:#2a2040;--pink:#ff4fd8;--cyan:#4ff0ff;--yel:#ffe45c;--green:#3ddc84;--red:#ff4d4d;--mute:#9b8fb3}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;min-height:100dvh;background:radial-gradient(ellipse 70% 50% at 50% 0,#2a1840,var(--bg) 70%) var(--bg);color:#fff;
+  font-family:"Press Start 2P",ui-monospace,monospace;display:flex;flex-direction:column;align-items:center;padding:28px 16px calc(20px + env(safe-area-inset-bottom));
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.cab{width:min(500px,100%);background:var(--cab);border:3px solid #000;border-radius:14px;overflow:hidden;box-shadow:0 20px 50px #0008}
+.marq{margin:0;padding:16px 10px 14px;text-align:center;background:linear-gradient(#2b1a44,var(--cab));border-bottom:3px solid #000;
+  font-size:clamp(14px,3.6vw,20px);font-weight:400;color:var(--yel);text-shadow:2px 2px 0 #b5179e}
+.hud{display:flex;justify-content:space-between;font-size:8px;color:var(--mute);padding:12px 16px 8px}
+.hud b{display:block;color:#fff;font-weight:400;margin-top:5px;font-size:10px}
+.crt{position:relative;margin:0 14px 14px;border-radius:10px;background:#000;padding:6px;touch-action:none}
+.crt canvas{display:block;width:100%;aspect-ratio:1;border-radius:6px;background:#0b0714;image-rendering:pixelated}
+.crt::after{content:"";position:absolute;inset:6px;border-radius:6px;pointer-events:none;background:repeating-linear-gradient(0deg,#0000 0 2px,#0003 2px 3px)}
+.ov{position:absolute;inset:6px;display:grid;place-items:center;text-align:center;padding:12px;z-index:1}
+.ov[hidden]{display:none}
+.ov div{background:#0e0a16e6;border:2px solid var(--pink);padding:16px 18px;max-width:92%}
+.ov b{display:block;color:var(--yel);font-weight:400;font-size:12px;line-height:1.6}
+.ov b.blink{animation:bl 1s steps(2) infinite}
+.ov p{margin:12px 0 0;font-size:8px;color:var(--mute);line-height:1.9}
+.ov p.hi{color:var(--green)}
+.ov.clear div{border-color:var(--green)}.ov.clear b{color:var(--green)}
+@keyframes bl{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.ov b.blink{animation:none}}
+.pad{display:none}
+.pad button{font:inherit;color:#fff;background:var(--key);border:2px solid #000;border-radius:10px;box-shadow:0 3px 0 #000;font-size:14px;touch-action:manipulation;cursor:pointer}
+.pad button:active{transform:translateY(2px);box-shadow:0 1px 0 #000}
+.pad .u{grid-column:2}.pad .l{grid-column:1;grid-row:2}.pad .d{grid-column:2;grid-row:2}.pad .r{grid-column:3;grid-row:2}
+.pad .p{grid-column:1;grid-row:1;font-size:7px;color:var(--cyan)}.pad .m{grid-column:3;grid-row:1;font-size:7px;color:var(--yel)}
+.foot{font-size:7px;color:var(--mute);text-align:center;margin-top:16px;line-height:2.2}
+.foot a{color:var(--cyan);text-decoration:none}.foot a:hover{text-decoration:underline}
+.foot button{font:inherit;color:var(--yel);background:none;border:0;padding:0;cursor:pointer}
+.keys{display:block}
+@media (max-width:600px),(pointer:coarse){
+  body{padding:16px 12px calc(16px + env(safe-area-inset-bottom))}
+  .pad{display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(2,56px);gap:8px;justify-content:center;padding:2px 0 16px}
+  .keys{display:none}
+}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
 </head>
 <body>
-    <!-- Preload mascot image -->
-    <img id="mascot-img" src="/images/o11y_alert.png" alt="O11y Mascot" style="display: none;"
-         onload="console.log('✅ Mascot image loaded successfully')" 
-         onerror="console.log('⚠️ Mascot image failed to load from /images/o11y_alert.png')">
-    
-    <!-- Loading screen -->
-    <div id="loading" class="loading">
-        <div class="spinner"></div>
-        <div>Loading Incident Commander...</div>
-    </div>
-    
-    <!-- Game container (initially hidden) -->
-    <div id="game-container" style="display: none;">
-        <!-- Game Title Header -->
-        <div id="game-title">
-            <h1>
-                <span class="title-icon">🚨</span>
-                <span class="title-text">Incident Commander</span>
-            </h1>
-        </div>
-        
-        <!-- Main game area with sidebar -->
-        <div id="game-main">
-            <!-- Game canvas area -->
-            <div id="game-area">
-                <div id="game-canvas-container">
-                    <canvas id="game-canvas"></canvas>
-                </div>
-            </div>
-            
-            <!-- Left sidebar with stats and controls -->
-            <div id="game-sidebar">
-                <!-- Score panel -->
-                <div id="score-panel">
-                    <span id="score">Score: 0</span>
-                    <span id="level">Level: 1</span>
-                    <span id="alerts">Alerts: 0/5</span>
-                </div>
-                
-                <!-- Game state indicator -->
-                <div id="game-state" class="playing">🎮 Loading...</div>
-                
-                <!-- Keyboard controls info -->
-                <div class="keyboard-info">
-                    <strong>🎮 Controls:</strong><br>
-                    Arrow Keys or WASD: Move<br>
-                    Space or P: Pause<br>
-                    R: Restart
-                </div>
-                
-                <!-- Touch controls -->
-                <div id="controls">
-                    <div class="control-row">
-                        <button id="btn-pause" class="control-btn">⏸️</button>
-                        <button id="btn-up" class="control-btn">↑</button>
-                        <button id="btn-restart" class="control-btn">🔄</button>
-                    </div>
-                    <div class="control-row">
-                        <button id="btn-left" class="control-btn">←</button>
-                        <button id="btn-down" class="control-btn">↓</button>
-                        <button id="btn-right" class="control-btn">→</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- WebAssembly support -->
-    <script src="/static/wasm_exec.js"></script>
-    
-    <script>
-        // Check if WebAssembly is supported
-        if (!WebAssembly.instantiateStreaming) {
-            WebAssembly.instantiateStreaming = async (resp, importObject) => {
-                const source = await (await resp).arrayBuffer();
-                return await WebAssembly.instantiate(source, importObject);
-            };
-        }
-        
-        // Initialize the game
-        async function initGame() {
-            try {
-                console.log('Starting WebAssembly initialization...');
-                
-                // Wait a bit for images to load
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                // Check if Go class is available
-                if (typeof Go === 'undefined') {
-                    throw new Error('Go WebAssembly support not loaded. Check if wasm_exec.js is available.');
-                }
-                
-                console.log('Go class found, creating instance...');
-                const go = new Go();
-                
-                console.log('Fetching WebAssembly module...');
-                const wasmResponse = await fetch("/static/game.wasm");
-                if (!wasmResponse.ok) {
-                    throw new Error(`Failed to fetch WASM: ${wasmResponse.status} ${wasmResponse.statusText}`);
-                }
-                
-                console.log('Loading WebAssembly module...');
-                const result = await WebAssembly.instantiateStreaming(wasmResponse, go.importObject);
-                
-                console.log('WebAssembly module loaded successfully');
-                
-                // Hide loading screen
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('game-container').style.display = 'flex';
-                
-                // Optimize canvas after showing game container
-                setTimeout(() => {
-                    optimizeCanvas();
-                    
-                    // Trigger a window resize event to ensure WASM game picks up new canvas size
-                    setTimeout(() => {
-                        window.dispatchEvent(new Event('resize'));
-                    }, 200);
-                }, 100);
-                
-                console.log('Running WebAssembly module...');
-                // Run the WebAssembly module
-                go.run(result.instance);
-                
-                console.log('Game initialized successfully!');
-                
-            } catch (error) {
-                console.error('Failed to load WebAssembly module:', error);
-                document.getElementById('loading').innerHTML = 
-                    '<div>❌ Failed to load game</div>' +
-                    '<div style="font-size: 14px; margin-top: 10px;">Error: ' + error.message + '</div>' +
-                    '<div style="font-size: 12px; margin-top: 10px;">Check browser console for details</div>';
-            }
-        }
-        
-        // Start the game when the page loads
-        window.addEventListener('load', initGame);
-        
-        // Prevent context menu on mobile
-        window.addEventListener('contextmenu', e => e.preventDefault());
-        
-        // Prevent zoom on double tap (iOS)
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', function (event) {
-            const now = (new Date()).getTime();
-            if (now - lastTouchEnd <= 300) {
-                event.preventDefault();
-            }
-            lastTouchEnd = now;
-        }, false);
-        
-        // Prevent scrolling
-        document.addEventListener('touchmove', function(e) {
-            e.preventDefault();
-        }, { passive: false });
-        
-        // Responsive canvas optimization for both mobile and desktop
-        function optimizeCanvas() {
-            const canvas = document.getElementById('game-canvas');
-            const container = document.getElementById('game-canvas-container');
-            
-            if (canvas && container) {
-                const isMobile = window.innerWidth < 768;
-                
-                // Calculate responsive size based on available space
-                setTimeout(() => {
-                    const containerRect = container.getBoundingClientRect();
-                    const viewportWidth = window.innerWidth;
-                    const viewportHeight = window.innerHeight;
-                    
-                    let finalSize;
-                    
-                    if (isMobile) {
-                        // Mobile: Use actual available space with safety margins
-                        if (containerRect.width > 0 && containerRect.height > 0) {
-                            // Use container dimensions with padding
-                            const containerWidth = containerRect.width - 20;
-                            const containerHeight = containerRect.height - 20;
-                            finalSize = Math.min(containerWidth, containerHeight);
-                        } else {
-                            // Fallback: Use viewport with UI space reserved
-                            const availableWidth = viewportWidth - 40;
-                            const availableHeight = viewportHeight - 200; // Title + controls + padding
-                            finalSize = Math.min(availableWidth, availableHeight);
-                        }
-                        
-                        // Ensure reasonable bounds for mobile
-                        finalSize = Math.max(Math.min(finalSize, viewportWidth * 0.85), 180);
-                        
-                    } else {
-                        // Desktop: Use container space efficiently
-                        if (containerRect.width > 0 && containerRect.height > 0) {
-                            const containerWidth = containerRect.width * 0.9;
-                            const containerHeight = containerRect.height * 0.9;
-                            finalSize = Math.min(containerWidth, containerHeight);
-                        } else {
-                            // Fallback for desktop
-                            finalSize = Math.min(viewportWidth * 0.6, viewportHeight * 0.8, 600);
-                        }
-                        
-                        // Ensure reasonable bounds for desktop
-                        finalSize = Math.max(Math.min(finalSize, 800), 300);
-                    }
-                    
-                    console.log(`Responsive canvas sizing: ${isMobile ? 'Mobile' : 'Desktop'} - container(${containerRect.width}x${containerRect.height}), viewport(${viewportWidth}x${viewportHeight}), final: ${Math.round(finalSize)}px`);
-                    
-                    // Apply the calculated size
-                    const roundedSize = Math.round(finalSize);
-                    canvas.style.width = roundedSize + 'px';
-                    canvas.style.height = roundedSize + 'px';
-                    
-                    // Set canvas resolution to match display size exactly
-                    canvas.width = roundedSize;
-                    canvas.height = roundedSize;
-                    
-                    // Ensure canvas is properly centered and positioned
-                    canvas.style.display = 'block';
-                    canvas.style.margin = '0 auto';
-                    
-                    // Clear any transform or positioning that might offset the canvas
-                    canvas.style.transform = 'none';
-                    canvas.style.position = 'static';
-                    
-                    console.log(`Canvas applied: ${roundedSize}px display, ${canvas.width}x${canvas.height} resolution`);
-                    
-                }, isMobile ? 50 : 100);
-            }
-        }
-        
-        // Handle device orientation changes and resize
-        window.addEventListener('orientationchange', function() {
-            setTimeout(() => {
-                optimizeCanvas();
-                // Force viewport height recalculation on iOS
-                document.documentElement.style.setProperty('--vh', window.innerHeight * 0.01 + 'px');
-            }, 200);
-        });
-        
-        window.addEventListener('resize', function() {
-            setTimeout(optimizeCanvas, 150);
-        });
-        
-        // Initialize canvas optimizations when DOM is ready
-        window.addEventListener('DOMContentLoaded', function() {
-            setTimeout(optimizeCanvas, 200);
-            // Set initial viewport height for iOS
-            document.documentElement.style.setProperty('--vh', window.innerHeight * 0.01 + 'px');
-        });
-    </script>
+<main class="cab">
+  <h1 class="marq">INCIDENT COMMANDER</h1>
+  <div class="hud" aria-live="off">
+    <span>SCORE<b id="score">000000</b></span>
+    <span>HI<b id="hi">000000</b></span>
+    <span>LEVEL<b id="level">01</b></span>
+    <span>ALERTS<b id="alerts">0/5</b></span>
+  </div>
+  <div class="crt" id="crt">
+    <canvas id="game-canvas" width="600" height="600" aria-label="Game board"></canvas>
+    <div class="ov" id="ov"><div><b class="blink">LOADING…</b></div></div>
+  </div>
+  <div class="pad" id="pad">
+    <button class="p" data-cmd="toggle" id="pad-p" aria-label="Start or pause">START</button>
+    <button class="u" data-cmd="up" aria-label="Up">▲</button>
+    <button class="m" data-cmd="mute" id="pad-m" aria-label="Sound on or off">SOUND</button>
+    <button class="l" data-cmd="left" aria-label="Left">◀</button>
+    <button class="d" data-cmd="down" aria-label="Down">▼</button>
+    <button class="r" data-cmd="right" aria-label="Right">▶</button>
+  </div>
+</main>
+<p class="foot">
+  <span class="keys">ARROWS / WASD MOVE · SPACE PAUSE · M SOUND: <button id="mute-link" type="button">ON</button><br></span>
+  A GAME BY <a href="https://www.nathannam.com">NATHAN NAM</a> · <a href="https://github.com/NathanNam/incident-commander-game">CODE</a>
+</p>
+<p class="sr" id="sr" aria-live="polite"></p>
+
+<script src="/wasm_exec.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const canvas = $('game-canvas'), ov = $('ov');
+  const store = {
+    get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  };
+  let hi = +store.get('ic.hi', 0) || 0;
+  let muted = store.get('ic.muted', '0') === '1';
+  let state = 'loading', last = {};
+  const pad = (n, w) => String(n).padStart(w, '0');
+
+  // ---- canvas: device pixels, a multiple of the 20-cell grid --------------------------
+  function sizeCanvas() {
+    const css = canvas.getBoundingClientRect().width;
+    const px = Math.max(200, Math.floor(css * (window.devicePixelRatio || 1) / 20) * 20);
+    if (canvas.width !== px) { canvas.width = canvas.height = px; window.ic.redraw?.(); }
+  }
+  new ResizeObserver(sizeCanvas).observe(canvas);
+
+  // ---- sound: tiny square-wave blips, made on the fly ----------------------------------
+  let ac;
+  function beep(notes) {
+    if (muted) return;
+    try {
+      ac ??= new (window.AudioContext || window.webkitAudioContext)();
+      let t = ac.currentTime;
+      for (const [freq, dur] of notes) {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'square'; o.frequency.value = freq;
+        g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur);
+        t += dur * 0.9;
+      }
+    } catch {}
+  }
+  const SOUNDS = {
+    collect: [[880, .06], [1320, .08]],
+    levelup: [[523, .09], [659, .09], [784, .09], [1047, .18]],
+    gameover: [[392, .14], [330, .14], [262, .14], [196, .3]],
+    won: [[523, .1], [659, .1], [784, .1], [1047, .1], [784, .1], [1047, .35]],
+  };
+  function setMuted(m) {
+    muted = m; store.set('ic.muted', m ? '1' : '0');
+    $('mute-link').textContent = m ? 'OFF' : 'ON';
+    $('pad-m').textContent = m ? 'MUTED' : 'SOUND';
+  }
+  setMuted(muted);
+
+  // ---- overlays ------------------------------------------------------------------------
+  function show(html, cls = '') { ov.className = 'ov ' + cls; ov.innerHTML = `<div>${html}</div>`; ov.hidden = false; }
+  const touch = matchMedia('(max-width:600px),(pointer:coarse)').matches;
+  const howTo = touch ? 'SWIPE OR USE THE ARROWS' : 'ARROW KEYS OR WASD';
+  let newHi = false;
+
+  function render(s) {
+    $('score').textContent = pad(s.score, 6);
+    $('hi').textContent = pad(Math.max(hi, s.score), 6);
+    $('level').textContent = pad(s.level, 2);
+    $('alerts').textContent = `${s.alerts}/${s.needed}`;
+    $('pad-p').textContent = s.state === 'playing' ? 'PAUSE' : 'START';
+    if (s.state === state && s.level === last.level) { last = s; return; }
+    state = s.state; last = s;
+    switch (state) {
+      case 'ready': newHi = false; show(`<b class="blink">PRESS START</b><p>${howTo}<br>RESOLVE EVERY ALERT.<br>DON'T HIT YOUR TRAIL.</p>`); break;
+      case 'paused': show(`<b>PAUSED</b><p>${touch ? 'TAP START' : 'SPACE'} TO RESUME</p>`); break;
+      case 'levelclear': show(`<b>LEVEL ${pad(s.level, 2)} CLEAR</b><p>ALL ALERTS RESOLVED</p>`, 'clear'); break;
+      case 'gameover': show(`<b>GAME OVER</b><p>SCORE ${pad(s.score, 6)}</p>${newHi ? '<p class="hi">NEW HI-SCORE!</p>' : ''}<p>${touch ? 'TAP START' : 'SPACE'} TO PLAY AGAIN</p>`); break;
+      case 'won': show(`<b>ALL CLEAR!</b><p>10 LEVELS · SCORE ${pad(s.score, 6)}</p>${newHi ? '<p class="hi">NEW HI-SCORE!</p>' : ''}<p>THE PAGER IS QUIET. FOR NOW.</p>`, 'clear'); break;
+      default: ov.hidden = true;
+    }
+    $('sr').textContent = state === 'playing' ? '' : ov.textContent;
+  }
+
+  window.ic = {
+    onReady() { sizeCanvas(); },
+    onFrame: render,
+    onEvent(name) {
+      if ((name === 'gameover' || name === 'won') && last.score > hi) {
+        hi = last.score; newHi = true; store.set('ic.hi', hi);
+      }
+      beep(SOUNDS[name] || []);
+    },
+  };
+
+  // ---- controls ------------------------------------------------------------------------
+  function command(cmd) {
+    if (!window.ic.control) return;
+    if (cmd === 'mute') return setMuted(!muted);
+    if (cmd === 'toggle') cmd = state === 'playing' || state === 'paused' ? 'pause' : 'start';
+    if (['up', 'down', 'left', 'right'].includes(cmd) && (state === 'gameover' || state === 'won')) return;
+    if (['up', 'down', 'left', 'right'].includes(cmd) && state === 'paused') window.ic.control('pause');
+    window.ic.control(cmd);
+  }
+  const KEYS = { ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down', ArrowLeft: 'left', a: 'left', A: 'left',
+    ArrowRight: 'right', d: 'right', D: 'right', ' ': 'toggle', Enter: 'toggle', p: 'toggle', P: 'toggle', r: 'restart', R: 'restart', m: 'mute', M: 'mute' };
+  addEventListener('keydown', (e) => {
+    const cmd = KEYS[e.key];
+    if (!cmd || e.metaKey || e.ctrlKey || e.altKey) return;
+    e.preventDefault(); command(cmd);
+  });
+  $('pad').addEventListener('pointerdown', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    e.preventDefault(); command(b.dataset.cmd);
+  });
+  $('mute-link').addEventListener('click', () => command('mute'));
+
+  // Swipe on the screen to steer; tap to start or pause.
+  let t0 = null;
+  const crt = $('crt');
+  crt.addEventListener('pointerdown', (e) => { t0 = { x: e.clientX, y: e.clientY }; });
+  crt.addEventListener('pointerup', (e) => {
+    if (!t0) return;
+    const dx = e.clientX - t0.x, dy = e.clientY - t0.y; t0 = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return command('toggle');
+    command(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+  });
+
+  // ---- boot ----------------------------------------------------------------------------
+  const go = new Go();
+  WebAssembly.instantiateStreaming(fetch('/game.wasm'), go.importObject)
+    .then(({ instance }) => go.run(instance))
+    .catch((err) => { console.error(err); show('<b>COULDN\'T LOAD</b><p>REFRESH TO TRY AGAIN</p>'); });
+})();
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
