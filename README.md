@@ -1,5 +1,7 @@
 # Incident Commander
 
+![Incident Commander](web/og.png)
+
 A retro arcade game about being on call. Steer the Incident Commander around the board, resolve every alert, and don't run into the trail of incidents you've already closed. Ten levels, each a little faster, with walls and mazes from level 3.
 
 **Play:** https://incident-commander-game.vercel.app
@@ -54,4 +56,4 @@ make brand   # favicon + share image (Chrome + puppeteer-core)
 
 ## Credits
 
-Game and pixel art by [Nathan Nam](https://www.nathannam.com). Font: Press Start 2P (SIL Open Font License). Code under the Apache License 2.0 (see `LICENSE`).
+Game, pixel art and music by [Nathan Nam](https://www.nathannam.com); the hero is a pixel take on his on-call robot concept. Font: Press Start 2P (SIL Open Font License). Code under the Apache License 2.0 (see `LICENSE`).
