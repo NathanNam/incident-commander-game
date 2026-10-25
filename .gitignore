@@ -1,16 +1,5 @@
-# Environment variables (contains sensitive credentials)
-.env
-
-# Build artifacts
-incident-commander-server
-
-# Runtime files
-incident-commander.log
-incident-commander.pid
-
-# macOS
+node_modules/
+.vercel/
 .DS_Store
-
-# Go
 *.test
 *.out
