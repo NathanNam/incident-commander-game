@@ -100,6 +100,7 @@ body{margin:0;min-height:100vh;min-height:100dvh;background:radial-gradient(elli
 <p class="sr" id="sr" aria-live="polite"></p>
 
 <script src="/wasm_exec.js"></script>
+<script src="/sound.js"></script>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -109,7 +110,6 @@ body{margin:0;min-height:100vh;min-height:100dvh;background:radial-gradient(elli
     set(k, v) { try { localStorage.setItem(k, v); } catch {} },
   };
   let hi = +store.get('ic.hi', 0) || 0;
-  let muted = store.get('ic.muted', '0') === '1';
   let state = 'loading', last = {};
   const pad = (n, w) => String(n).padStart(w, '0');
 
@@ -121,34 +121,16 @@ body{margin:0;min-height:100vh;min-height:100dvh;background:radial-gradient(elli
   }
   new ResizeObserver(sizeCanvas).observe(canvas);
 
-  // ---- sound: tiny square-wave blips, made on the fly ----------------------------------
-  let ac;
-  function beep(notes) {
-    if (muted) return;
-    try {
-      ac ??= new (window.AudioContext || window.webkitAudioContext)();
-      let t = ac.currentTime;
-      for (const [freq, dur] of notes) {
-        const o = ac.createOscillator(), g = ac.createGain();
-        o.type = 'square'; o.frequency.value = freq;
-        g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-        o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur);
-        t += dur * 0.9;
-      }
-    } catch {}
+  // ---- sound (web/sound.js): M or SOUND cycles all → effects only → off -------------
+  const SOUND_MODES = ['all', 'fx', 'off'];
+  const SOUND_LABEL = { all: ['ON', 'SOUND'], fx: ['FX ONLY', 'FX ONLY'], off: ['OFF', 'MUTED'] };
+  function setSound(m) {
+    if (!SOUND_MODES.includes(m)) m = 'all';
+    icSound.setMode(m); store.set('ic.sound', m);
+    $('mute-link').textContent = SOUND_LABEL[m][0];
+    $('pad-m').textContent = SOUND_LABEL[m][1];
   }
-  const SOUNDS = {
-    collect: [[880, .06], [1320, .08]],
-    levelup: [[523, .09], [659, .09], [784, .09], [1047, .18]],
-    gameover: [[392, .14], [330, .14], [262, .14], [196, .3]],
-    won: [[523, .1], [659, .1], [784, .1], [1047, .1], [784, .1], [1047, .35]],
-  };
-  function setMuted(m) {
-    muted = m; store.set('ic.muted', m ? '1' : '0');
-    $('mute-link').textContent = m ? 'OFF' : 'ON';
-    $('pad-m').textContent = m ? 'MUTED' : 'SOUND';
-  }
-  setMuted(muted);
+  setSound(store.get('ic.sound', 'all'));
 
   // ---- overlays ------------------------------------------------------------------------
   function show(html, cls = '') { ov.className = 'ov ' + cls; ov.innerHTML = `<div>${html}</div>`; ov.hidden = false; }
@@ -163,7 +145,14 @@ body{margin:0;min-height:100vh;min-height:100dvh;background:radial-gradient(elli
     $('alerts').textContent = `${s.alerts}/${s.needed}`;
     $('pad-p').textContent = s.state === 'playing' ? 'PAUSE' : 'START';
     if (s.state === state && s.level === last.level) { last = s; return; }
+    const was = state;
     state = s.state; last = s;
+    // Music plays only while the commander is moving; it restarts from the top on a new game.
+    if (state === 'playing' && (was === 'ready' || was === 'gameover' || was === 'won')) icSound.restartMusic();
+    icSound.music(state === 'playing', s.level);
+    if (state === 'playing' && was === 'paused') icSound.sfx('resume');
+    else if (state === 'playing' && was !== 'levelclear' && was !== 'loading') icSound.sfx('start');
+    else if (state === 'paused') icSound.sfx('pause');
     switch (state) {
       case 'ready': newHi = false; show(`<b class="blink">PRESS START</b><p>${howTo}<br>RESOLVE EVERY ALERT.<br>DON'T HIT YOUR TRAIL.</p>`); break;
       case 'paused': show(`<b>PAUSED</b><p>${touch ? 'TAP START' : 'SPACE'} TO RESUME</p>`); break;
@@ -182,14 +171,14 @@ body{margin:0;min-height:100vh;min-height:100dvh;background:radial-gradient(elli
       if ((name === 'gameover' || name === 'won') && last.score > hi) {
         hi = last.score; newHi = true; store.set('ic.hi', hi);
       }
-      beep(SOUNDS[name] || []);
+      icSound.sfx(name);
     },
   };
 
   // ---- controls ------------------------------------------------------------------------
   function command(cmd) {
     if (!window.ic.control) return;
-    if (cmd === 'mute') return setMuted(!muted);
+    if (cmd === 'mute') return setSound(SOUND_MODES[(SOUND_MODES.indexOf(icSound.mode) + 1) % 3]);
     if (cmd === 'toggle') cmd = state === 'playing' || state === 'paused' ? 'pause' : 'start';
     if (['up', 'down', 'left', 'right'].includes(cmd) && (state === 'gameover' || state === 'won')) return;
     if (['up', 'down', 'left', 'right'].includes(cmd) && state === 'paused') window.ic.control('pause');
@@ -217,6 +206,11 @@ body{margin:0;min-height:100vh;min-height:100dvh;background:radial-gradient(elli
     const dx = e.clientX - t0.x, dy = e.clientY - t0.y; t0 = null;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return command('toggle');
     command(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+  });
+
+  // Pause when the tab is hidden, so the music doesn't play in the background.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && state === 'playing') window.ic.control?.('pause');
   });
 
   // ---- boot ----------------------------------------------------------------------------
